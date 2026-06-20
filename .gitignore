@@ -9,3 +9,7 @@ yarn-error.log*
 coverage/
 .env
 .env.*
+
+# Generated seed artifacts (reproducible from scripts/generate-seed.mjs)
+scripts/.gen/
+supabase/.gen/
