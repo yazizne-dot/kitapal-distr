@@ -1,0 +1,1460 @@
+<main class="login-page" *ngIf="!signedIn()">
+  <section class="login-panel">
+    <!-- Kitapal логотипі -->
+    <div class="kp-logo-wrap">
+      <img src="assets/kitapal-logo.png" alt="Kitapal" class="kp-logo-img">
+      <p class="kp-mission">Қазақстанды кітап оқитын елге айналдырамыз</p>
+    </div>
+
+    <div class="login-divider"></div>
+
+    <label>
+      Логин
+      <input type="text" [(ngModel)]="email" placeholder="astana" (keyup.enter)="login()">
+    </label>
+    <label>
+      Пароль
+      <input type="password" [(ngModel)]="password" placeholder="••••••••" (keyup.enter)="login()">
+    </label>
+
+    <label class="login-remember">
+      <input type="checkbox" [(ngModel)]="rememberMe">
+      Есімде сақта
+    </label>
+
+    <div class="login-error" *ngIf="loginError">{{ loginError }}</div>
+
+    <div class="login-actions">
+      <button type="button" (click)="login()">Кіру</button>
+    </div>
+
+  </section>
+</main>
+
+<main class="app-shell" *ngIf="signedIn()">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="assets/kitapal-logo.png" alt="Kitapal" class="sidebar-logo-img">
+    </div>
+
+    <nav>
+      <button
+        type="button"
+        *ngFor="let item of currentMenu()"
+        [class.active]="activeScreen() === item[0]"
+        (click)="navigate(item[0])"
+      >
+        {{ item[1] }}
+        <span class="menu-badge"
+          *ngIf="item[0] === 'orders' && pendingOrders().length > 0 && role() !== 'distributor'">
+          {{ pendingOrders().length }}
+        </span>
+      </button>
+    </nav>
+
+    <button class="logout" type="button" (click)="logout()">Шығу</button>
+  </aside>
+
+  <section class="workspace">
+    <header class="topbar">
+      <div class="topbar-brand">
+        <h1>{{ role() === 'distributor' ? selectedDistributor().company : 'Kitapal company distribution' }}</h1>
+        <small *ngIf="role() === 'distributor'" class="topbar-sub">{{ selectedDistributor().city }} дистрибьюторы</small>
+      </div>
+      <div class="profile-trigger">
+        <div class="profile-av">{{ (currentUser()?.name ?? email).charAt(0).toUpperCase() }}</div>
+        <button type="button" class="profile-btn" (click)="profileOpen.set(!profileOpen())">
+          <div class="profile-btn-info">
+            <strong>{{ currentUser()?.name ?? email }}</strong>
+            <small>8 сағат · {{ role() }}</small>
+          </div>
+          <span class="chevron" [class.open]="profileOpen()">▾</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ══ OVERVIEW ══ -->
+    <section class="screen" *ngIf="activeScreen() === 'overview'">
+      <div class="stats-grid">
+        <article>
+          <span>6 айлық мақсат</span>
+          <strong>{{ totalTarget() | kzt }}</strong>
+          <small>Қаңтар / Шілде кезеңі</small>
+        </article>
+        <article>
+          <span>Орындалған сома</span>
+          <strong>{{ totalAchieved() | kzt }}</strong>
+          <small>{{ totalAchieved() / totalTarget() | percent }}</small>
+        </article>
+        <article>
+          <span>Жалпы қарыз</span>
+          <strong>{{ totalDebt() | kzt }}</strong>
+          <small>қарыздар + төлемдер</small>
+        </article>
+        <article>
+          <span>Кредит лимит</span>
+          <strong>{{ totalCredit() | kzt }}</strong>
+          <small>кредит лимитін тексеру</small>
+        </article>
+      </div>
+
+      <div class="dashboard-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>Мақсат прогресі</h2>
+            <span>2026-Ж1 кезеңі</span>
+          </div>
+          <div class="goal-list">
+            <label *ngFor="let item of visibleDistributors()">
+              <span>{{ item.city }} · {{ item.company }}</span>
+              <b>{{ progress(item) | percent }}</b>
+              <i><em [style.width.%]="progress(item) * 100"></em></i>
+            </label>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>Хабарламалар</h2>
+          </div>
+          <ng-container *ngFor="let n of computedNotifications().slice(0, 4)">
+            <div class="notice" [class.danger]="n.type === 'danger'" [class.success]="n.type === 'success'" [class.warn]="n.type === 'warning'">
+              <strong>{{ n.title }}</strong>
+              <span> — {{ n.body }}</span>
+            </div>
+          </ng-container>
+          <div *ngIf="computedNotifications().length === 0" class="notice">Белсенді хабарлама жоқ</div>
+          <button type="button" class="notif-more-btn" *ngIf="computedNotifications().length > 4" (click)="navigate('notifications')">
+            Барлығын көру ({{ computedNotifications().length }})
+          </button>
+        </article>
+      </div>
+
+      <!-- ══ ЖАҢА ТАПСЫРЫСТАР (тек менеджер/admin үшін) ══ -->
+      <div class="pending-orders-panel" *ngIf="role() !== 'distributor' && pendingOrders().length > 0">
+        <div class="pending-header">
+          <div class="pending-title">
+            <span class="pending-dot"></span>
+            <h3>Назар аударуды қажет — {{ pendingOrders().length }} тапсырыс</h3>
+          </div>
+          <button type="button" class="btn-view-all" (click)="navigate('orders')">Барлығын ашу →</button>
+        </div>
+        <div class="pending-list">
+          <div class="pending-item" *ngFor="let o of pendingOrders()" (click)="navigate('orders'); openOrder(o.id)">
+            <div class="pending-item-left">
+              <strong>{{ orderDistributor(o).company }}</strong>
+              <span>{{ orderDistributor(o).city }} · {{ o.createdAt }}</span>
+            </div>
+            <div class="pending-item-right">
+              <strong class="pending-amount">{{ o.amount | kzt }}</strong>
+              <span class="badge badge-pending" *ngIf="o.status === 'pending'">Расталуды күтуде</span>
+              <span class="badge danger" *ngIf="o.status === 'draft'">Лимит асты — қарауды қажет</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ GOALS ══ -->
+    <section class="screen" *ngIf="activeScreen() === 'goals'">
+      <div class="section-head">
+        <div>
+          <h2>Мақсат және жеңілдік жүйесі</h2>
+        </div>
+        <button type="button">Жаңа 6 айлық кезең</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Қала</th>
+            <th>Дистрибьютор</th>
+            <th>Мақсат</th>
+            <th>Орындалды</th>
+            <th>Жеңілдік</th>
+            <th>Прогресс</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of distributors()">
+            <td>{{ item.city }}</td>
+            <td>{{ item.company }}</td>
+            <td>{{ item.target | kzt }}</td>
+            <td>{{ item.achieved | kzt }}</td>
+            <td>
+              <ng-container *ngIf="role() === 'admin' && editingDiscountDistId() === item.id; else discountView">
+                <input type="number" class="discount-edit-input" [(ngModel)]="editDiscountStr" min="0" max="100" step="1">%
+                <button type="button" class="btn-discount-save" title="Сақтау" (click)="saveDiscount(item.id)">✓</button>
+                <button type="button" class="btn-discount-cancel" title="Бас тарту" (click)="editingDiscountDistId.set(null)">✕</button>
+              </ng-container>
+              <ng-template #discountView>
+                {{ item.discount | percent }}
+                <button type="button" class="btn-discount-edit" *ngIf="role() === 'admin'" title="Жеңілдікті өзгерту" (click)="startEditDiscount(item)">✎</button>
+              </ng-template>
+            </td>
+            <td><span class="badge">{{ progress(item) | percent }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ══ DISTRIBUTORS ══ -->
+    <section class="screen" *ngIf="activeScreen() === 'distributors'">
+
+      <!-- Тізім -->
+      <ng-container *ngIf="!distributorDetailId()">
+        <div class="section-head">
+          <div>
+            <h2>Дистрибьюторлар</h2>
+            <small class="result-count">{{ visibleDistributors().length }} дистрибьютор</small>
+          </div>
+          <button type="button" *ngIf="role() === 'admin'">Admin арқылы тіркеу</button>
+        </div>
+
+        <div class="cards-grid">
+          <article
+            class="partner-card clickable-card"
+            *ngFor="let item of visibleDistributors()"
+            (click)="openDistributorDetail(item.id)"
+          >
+            <div class="card-top-row">
+              <div>
+                <h3>{{ item.company }}</h3>
+                <span>{{ item.city }} · менеджер {{ item.manager }}</span>
+              </div>
+              <span class="card-open-hint">Айлар →</span>
+            </div>
+            <div class="card-progress">
+              <div class="card-progress-bar">
+                <div class="card-progress-fill" [style.width.%]="progress(item) * 100"></div>
+              </div>
+              <small>{{ progress(item) | percent }} орындалды</small>
+            </div>
+            <div class="partner-total">
+              <span>Лимит: {{ item.creditLimit | kzt }}</span>
+              <strong [class.overdue]="item.debt > item.creditLimit * 0.8">{{ item.debt | kzt }}</strong>
+            </div>
+          </article>
+        </div>
+      </ng-container>
+
+      <!-- ══ ДИСТРИБЬЮТОР ДЕТАЛЬДАРЫ ══ -->
+      <ng-container *ngIf="distributorDetailId() && selectedDetailDistributor()">
+
+        <!-- Навигация -->
+        <div class="detail-back-row">
+          <button type="button" class="btn-back" (click)="distributorDetailId.set(null); detailActiveMonth.set('all')">← Артқа</button>
+          <span class="breadcrumb">Дистрибьюторлар / {{ selectedDetailDistributor()!.company }}</span>
+        </div>
+
+        <!-- Тақырып + мета -->
+        <div class="dist-detail-header">
+          <div class="dist-detail-title">
+            <h2>{{ selectedDetailDistributor()!.company }}</h2>
+            <span class="dist-city-tag">{{ selectedDetailDistributor()!.city }}</span>
+          </div>
+          <div class="dist-detail-meta">
+            <span>Менеджер: <strong>{{ selectedDetailDistributor()!.manager }}</strong></span>
+            <span>Жеңілдік: <strong>{{ selectedDetailDistributor()!.discount | percent }}</strong></span>
+            <button type="button" class="btn-pay btn-pay-inline"
+              *ngIf="role() === 'admin' || role() === 'manager'"
+              (click)="openPaymentModal(selectedDetailDistributor()!.id)">
+              + Төлем тіркеу
+            </button>
+            <button type="button" class="btn-pay btn-pay-inline"
+              *ngIf="role() === 'admin' || role() === 'manager'"
+              (click)="openMessageModal(selectedDetailDistributor()!.id)">
+              ✉ Хабарлама жіберу
+            </button>
+          </div>
+        </div>
+
+        <!-- Дистрибьюторға жіберілген хабарламалар -->
+        <div class="dist-messages" *ngIf="messagesForDist(selectedDetailDistributor()!.id).length">
+          <h4>Хабарламалар</h4>
+          <div class="dist-message-item" *ngFor="let m of messagesForDist(selectedDetailDistributor()!.id)">
+            <div class="dist-message-meta">
+              <strong>{{ m.from }}</strong>
+              <span>{{ m.date }}</span>
+            </div>
+            <p>{{ m.text }}</p>
+          </div>
+        </div>
+
+        <!-- Жылдық статистика -->
+        <div class="stats-grid">
+          <article>
+            <span>Жылдық мақсат</span>
+            <strong>{{ selectedDetailDistributor()!.target | kzt }}</strong>
+            <small>{{ progress(selectedDetailDistributor()!) | percent }} орындалды</small>
+          </article>
+          <article>
+            <span>Реализация</span>
+            <strong>{{ selectedDetailDistributor()!.achieved | kzt }}</strong>
+            <small>2026 жыл</small>
+          </article>
+          <article>
+            <span>Нақты қарыз</span>
+            <strong [class.overdue]="selectedDetailDistributor()!.debt > selectedDetailDistributor()!.creditLimit">
+              {{ selectedDetailDistributor()!.debt | kzt }}
+            </strong>
+            <small [class.overdue]="selectedDetailDistributor()!.debt > selectedDetailDistributor()!.creditLimit">
+              {{ selectedDetailDistributor()!.debt > selectedDetailDistributor()!.creditLimit ? 'Лимит асылды' : 'Лимит ішінде' }}
+            </small>
+          </article>
+          <article>
+            <span>Кредит лимиті</span>
+            <strong>{{ selectedDetailDistributor()!.creditLimit | kzt }}</strong>
+            <small>Қалды: {{ (selectedDetailDistributor()!.creditLimit - selectedDetailDistributor()!.debt) | kzt }}</small>
+          </article>
+        </div>
+
+        <!-- Прогресс -->
+        <div class="dist-progress-panel">
+          <div class="dist-progress-bar">
+            <div class="dist-progress-fill" [style.width.%]="progress(selectedDetailDistributor()!) * 100"></div>
+          </div>
+          <span>{{ progress(selectedDetailDistributor()!) | percent }} · мақсат {{ selectedDetailDistributor()!.target | kzt }}</span>
+        </div>
+
+        <!-- ══ АЙ БОЙЫНША ВКЛАДКАЛАР ══ -->
+        <div class="month-tabs-section">
+          <div class="month-tabs-label">Ай бойынша бөлу</div>
+          <div class="month-tabs">
+
+            <!-- Барлығы -->
+            <button type="button"
+              class="month-tab"
+              [class.active]="detailActiveMonth() === 'all'"
+              (click)="detailActiveMonth.set('all')">
+              <span class="mtab-name">Барлығы</span>
+              <span class="mtab-badge" *ngIf="distributorDetailOrders().length > 0">{{ distributorDetailOrders().length }}</span>
+            </button>
+
+            <!-- 12 ай -->
+            <button type="button"
+              *ngFor="let m of YEAR_MONTHS"
+              class="month-tab"
+              [class.active]="detailActiveMonth() === m"
+              [class.has-data]="!!detailMonthStats()[m]"
+              (click)="detailActiveMonth.set(m)">
+              <span class="mtab-name">{{ monthLabel(m) }}</span>
+              <span class="mtab-badge" *ngIf="detailMonthStats()[m]">{{ detailMonthStats()[m].orderCount }}</span>
+            </button>
+
+          </div>
+        </div>
+
+        <!-- ══ ТАҢДАЛҒАН АЙ МАЗМҰНЫ ══ -->
+        <ng-container *ngIf="detailActiveMonth() !== 'all'">
+          <!-- Таңдалған ай статистикасы -->
+          <div class="month-stats-bar" *ngIf="detailMonthStats()[detailActiveMonth()]">
+            <div class="mstat">
+              <span>Тапсырыстар</span>
+              <strong>{{ detailMonthStats()[detailActiveMonth()].orderCount }}</strong>
+            </div>
+            <div class="mstat-sep"></div>
+            <div class="mstat">
+              <span>Жалпы сома</span>
+              <strong>{{ detailMonthStats()[detailActiveMonth()].total | kzt }}</strong>
+            </div>
+            <div class="mstat-sep"></div>
+            <div class="mstat">
+              <span>Кітап данасы</span>
+              <strong>{{ detailMonthStats()[detailActiveMonth()].itemCount }}</strong>
+            </div>
+          </div>
+          <div class="month-empty-state" *ngIf="!detailMonthStats()[detailActiveMonth()]">
+            <span>📦</span>
+            <p>{{ monthLabel(detailActiveMonth()) }} айында тапсырыс жоқ</p>
+          </div>
+        </ng-container>
+
+        <!-- "Барлығы" үшін жалпы сома -->
+        <div class="month-stats-bar" *ngIf="detailActiveMonth() === 'all' && distributorDetailOrders().length > 0">
+          <div class="mstat">
+            <span>Барлық тапсырыстар</span>
+            <strong>{{ distributorDetailOrders().length }}</strong>
+          </div>
+          <div class="mstat-sep"></div>
+          <div class="mstat">
+            <span>Жалпы сома</span>
+            <strong>{{ selectedDetailDistributor()!.achieved | kzt }}</strong>
+          </div>
+        </div>
+
+        <!-- Тапсырыстар кестесі -->
+        <ng-container *ngIf="detailFilteredOrders().length > 0">
+          <div class="dist-section-title" style="margin-top:20px">
+            <h3>
+              {{ detailActiveMonth() === 'all' ? 'Барлық тапсырыстар' : (monthLabel(detailActiveMonth()) + ' — тапсырыстар') }}
+            </h3>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Тапсырыс №</th>
+                <th>Күні</th>
+                <th>Статус</th>
+                <th>Кітаптар</th>
+                <th>Саны</th>
+                <th>Сома</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let order of detailFilteredOrders()">
+                <td class="order-num">{{ order.id }}</td>
+                <td>{{ order.createdAt | date:'dd.MM.yyyy' }}</td>
+                <td>
+                  <span class="badge badge-sm"
+                    [class.badge-pending]="order.status === 'pending'"
+                    [class.badge-confirmed]="order.status === 'confirmed'"
+                    [class.badge-shipped]="order.status === 'shipped'"
+                    [class.badge-delivered]="order.status === 'delivered'"
+                    [class.danger]="order.status === 'draft' || order.status === 'cancelled'"
+                  >{{ statusLabel(order.status) }}</span>
+                </td>
+                <td>{{ orderProductsLabel(order) }}</td>
+                <td>{{ totalOrderQty(order) }} дана</td>
+                <td><strong>{{ order.amount | kzt }}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Кітаптар тізімі -->
+          <div class="dist-section-title" style="margin-top:24px">
+            <h3>
+              {{ detailActiveMonth() === 'all' ? 'Барлық уақыт алынған кітаптар' : (monthLabel(detailActiveMonth()) + ' — кітаптар') }}
+            </h3>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Кітап атауы</th>
+                <th>Баспасы</th>
+                <th>Саны</th>
+                <th>Сомасы</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let b of distributorBooksAggregated()">
+                <td><strong>{{ b.name }}</strong></td>
+                <td>{{ b.publisher }}</td>
+                <td>{{ b.qty }} дана</td>
+                <td><strong>{{ b.amount | kzt }}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </ng-container>
+
+      </ng-container>
+    </section>
+
+    <!-- ══ PRICE ══ -->
+    <section class="screen" *ngIf="activeScreen() === 'price'">
+      <div class="section-head">
+        <div>
+          <h2>Прайс-лист</h2>
+          <small class="result-count">
+            {{ filteredProducts().length }} кітап табылды · {{ products().length }} кітап прайста
+          </small>
+        </div>
+        <div class="search-and-toggle">
+          <label class="search">
+            Іздеу
+            <input
+              type="search"
+              placeholder="Атауы, баспа, ISBN/штрихкод"
+              [ngModel]="productQuery()"
+              (ngModelChange)="productQuery.set($event); priceDisplayCount.set(priceViewMode() === 'grid' ? 8 : 40)"
+            >
+          </label>
+          <div class="view-toggle" *ngIf="role() === 'distributor'">
+            <button type="button" [class.active]="priceViewMode() === 'list'" (click)="priceViewMode.set('list'); priceDisplayCount.set(40)" title="Тізім">
+              <span class="icon-list">
+                <span></span><span></span><span></span>
+              </span>
+            </button>
+            <button type="button" [class.active]="priceViewMode() === 'grid'" (click)="priceViewMode.set('grid'); priceDisplayCount.set(8)" title="Кубик">
+              <span class="icon-grid">
+                <span></span><span></span><span></span><span></span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin/Manager price view -->
+      <ng-container *ngIf="role() !== 'distributor'">
+        <!-- Column visibility chips -->
+        <div class="col-vis-bar">
+          <span class="col-vis-label">Бағандар:</span>
+          <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('barcode')" (click)="toggleColumn('barcode')">Штрихкод</button>
+          <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('publisher')" (click)="toggleColumn('publisher')">Баспасы</button>
+          <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('category')" (click)="toggleColumn('category')">Санаты</button>
+          <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('basePrice')" (click)="toggleColumn('basePrice')">Негізгі баға</button>
+          <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('myPrice')" (click)="toggleColumn('myPrice')">Менің бағам</button>
+          <button type="button" class="col-chip-reset" *ngIf="hiddenColumns().length > 0" (click)="hiddenColumns.set([])">Барлығын қайтару</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th *ngIf="isColVisible('barcode')">Штрихкод / ISBN</th>
+              <th>Кітап атауы</th>
+              <th *ngIf="isColVisible('publisher')">Баспасы</th>
+              <th *ngIf="isColVisible('category')">Санаты</th>
+              <th *ngIf="isColVisible('basePrice')">Негізгі баға</th>
+              <th *ngIf="isColVisible('myPrice')">Менің бағам (40%)</th>
+              <th *ngIf="role() === 'admin' || role() === 'manager'"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let product of adminDisplayedProducts()">
+              <td *ngIf="isColVisible('barcode')"><small class="barcode-cell">{{ product.barcode }}</small></td>
+              <td><strong>{{ product.name }}</strong></td>
+              <td *ngIf="isColVisible('publisher')">{{ product.publisher }}</td>
+              <td *ngIf="isColVisible('category')">{{ product.category }}</td>
+              <td *ngIf="isColVisible('basePrice')">{{ product.basePrice | kzt }}</td>
+              <td *ngIf="isColVisible('myPrice')"><strong class="my-price-cell">{{ myPrice(product) | kzt }}</strong></td>
+              <td *ngIf="role() === 'admin' || role() === 'manager'">
+                <button type="button" class="btn-edit-sm" (click)="openEditProduct(product)">Өңдеу</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="load-more-wrap" *ngIf="adminFilteredProducts().length > adminDisplayedProducts().length">
+          <button type="button" class="load-more-btn" (click)="loadMorePrice()">
+            Тағы 10 жүктеу
+            <span class="load-more-count">({{ adminDisplayedProducts().length }} / {{ adminFilteredProducts().length }} кітап)</span>
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- Distributor price view -->
+      <div class="price-workspace" *ngIf="role() === 'distributor'">
+        <section class="price-main">
+          <div class="price-summary-strip">
+            <article>
+              <span>Менің жеңілдігім</span>
+              <strong>{{ selectedDistributor().discount | percent }}</strong>
+            </article>
+            <article>
+              <span>Қалған лимит</span>
+              <strong>{{ remainingLimit() | kzt }}</strong>
+            </article>
+            <article>
+              <span>Таңдалған кітап</span>
+              <strong>{{ priceDraftItems().length }}</strong>
+            </article>
+          </div>
+
+          <div class="category-tabs">
+            <button
+              type="button"
+              *ngFor="let category of categories()"
+              [class.active]="selectedCategory() === category"
+              (click)="selectedCategory.set(category); priceDisplayCount.set(priceViewMode() === 'grid' ? 8 : 40)"
+            >
+              {{ category }}
+            </button>
+          </div>
+
+          <!-- Тізім режімі -->
+          <div class="price-list-scroll" *ngIf="priceViewMode() === 'list'">
+            <table class="price-list-table">
+              <thead>
+                <tr>
+                  <th>Штрихкод</th>
+                  <th>Кітап</th>
+                  <th>Баспасы</th>
+                  <th>Негізгі баға</th>
+                  <th>Менің бағам</th>
+                  <th>Саны</th>
+                  <th>Қосынды</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let product of displayedProducts()">
+                  <td><small>{{ product.barcode }}</small></td>
+                  <td><strong>{{ product.name }}</strong></td>
+                  <td>{{ product.publisher }}</td>
+                  <td>{{ product.basePrice | kzt }}</td>
+                  <td><strong class="my-price-cell">{{ myPrice(product) | kzt }}</strong></td>
+                  <td>
+                    <div class="qty-row-sm">
+                      <button type="button" (click)="changePriceQty(product.id, -1)">−</button>
+                      <input type="number" min="0" [ngModel]="priceQty(product.id)" (ngModelChange)="setPriceQty(product.id, $event)">
+                      <button type="button" (click)="changePriceQty(product.id, 1)">+</button>
+                    </div>
+                  </td>
+                  <td><strong>{{ myPrice(product) * priceQty(product.id) | kzt }}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Кубик режімі -->
+          <div class="price-card-grid" *ngIf="priceViewMode() === 'grid'">
+            <article class="price-card" *ngFor="let product of displayedProducts()">
+              <div class="book-cover">
+                <span>{{ product.category }}</span>
+              </div>
+              <div class="price-card-body">
+                <div>
+                  <h3>{{ product.name }}</h3>
+                  <p>{{ product.publisher }}</p>
+                  <small>{{ product.barcode }}</small>
+                </div>
+                <div class="price-lines">
+                  <span>Негізгі баға <b>{{ product.basePrice | kzt }}</b></span>
+                  <span class="my-price">Менің бағам <b>{{ myPrice(product) | kzt }}</b></span>
+                </div>
+                <div class="qty-row">
+                  <button type="button" (click)="changePriceQty(product.id, -1)">−</button>
+                  <input
+                    type="number"
+                    min="0"
+                    [ngModel]="priceQty(product.id)"
+                    (ngModelChange)="setPriceQty(product.id, $event)"
+                  >
+                  <button type="button" (click)="changePriceQty(product.id, 1)">+</button>
+                  <strong>Қосынды: {{ myPrice(product) * priceQty(product.id) | kzt }}</strong>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="load-more-wrap" *ngIf="filteredProducts().length > displayedProducts().length">
+            <button type="button" class="load-more-btn" (click)="loadMorePrice()">
+              {{ priceViewMode() === 'grid' ? 'Көбірек ашу' : 'Тағы 40 жол ашу' }}
+              <span class="load-more-count">({{ displayedProducts().length }} / {{ filteredProducts().length }} кітап)</span>
+            </button>
+          </div>
+
+        </section>
+
+        <aside class="price-order">
+          <p>Тапсырыс черновигі</p>
+          <h2>{{ priceDraftTotal() | kzt }}</h2>
+
+          <div class="empty-cart" *ngIf="priceDraftItems().length === 0">
+            Кітап санын енгізсеңіз, тапсырыс осы жерде жиналады.
+          </div>
+
+          <div class="draft-list" *ngIf="priceDraftItems().length > 0">
+            <article *ngFor="let item of priceDraftItems()">
+              <div>
+                <strong>{{ item.product.name }}</strong>
+                <span>{{ item.qty }} дана × {{ myPrice(item.product) | kzt }}</span>
+              </div>
+              <b>{{ item.amount | kzt }}</b>
+            </article>
+          </div>
+
+          <div class="limit-warning" [class.danger]="priceDraftTotal() > remainingLimit()">
+            {{ priceDraftTotal() > remainingLimit() ? 'Лимиттен асады: Admin растауы керек' : 'Лимит ішінде: pending болып жіберіледі' }}
+          </div>
+
+          <button type="button" [disabled]="priceDraftItems().length === 0" (click)="createOrderFromPrice()">
+            Тапсырысқа жіберу
+          </button>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ══ ORDERS ══ -->
+    <section class="screen" *ngIf="activeScreen() === 'orders'">
+
+      <!-- ── ДИСТРИБЬЮТОР КӨРІНІСІ: айлық вкладкалар ── -->
+      <ng-container *ngIf="role() === 'distributor'">
+        <div class="section-head">
+          <div>
+            <h2>Тапсырыстар</h2>
+            <small class="result-count">{{ selectedDistributor().company }} · {{ selectedDistributor().city }}</small>
+          </div>
+          <button type="button" *ngIf="isCurrentMonth()" (click)="navigate('price')" class="btn-new-order">
+            + Жаңа тапсырыс беру
+          </button>
+        </div>
+
+        <!-- Ай вкладкалары -->
+        <div class="month-tabs-section">
+          <div class="month-tabs-label">Айды таңдаңыз (болашақ айлар жабық)</div>
+          <div class="month-tabs">
+            <button type="button"
+              *ngFor="let m of distributorAvailableMonths()"
+              class="month-tab"
+              [class.active]="distributorOrderMonth() === m"
+              [class.has-data]="!!distributorOrderCountByMonth()[m]"
+              (click)="distributorOrderMonth.set(m)">
+              <span class="mtab-name">{{ monthLabel(m) }}</span>
+              <span class="mtab-badge mtab-badge-light" *ngIf="m === CURRENT_MONTH">Ағымды</span>
+              <span class="mtab-badge" *ngIf="m !== CURRENT_MONTH && distributorOrderCountByMonth()[m]">
+                {{ distributorOrderCountByMonth()[m] }}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Архив хабары (өткен айлар) -->
+        <div class="archive-notice" *ngIf="!isCurrentMonth()">
+          🗂 {{ monthLabel(distributorOrderMonth()) }} — архив. Тапсырыстарды өзгерту мүмкін емес.
+        </div>
+
+        <!-- Бос ай -->
+        <div class="month-empty-state" *ngIf="distributorCurrentMonthOrders().length === 0">
+          <span>📦</span>
+          <p>{{ monthLabel(distributorOrderMonth()) }} айында тапсырыс жоқ</p>
+          <button type="button" *ngIf="isCurrentMonth()" (click)="navigate('price')" class="btn-new-order">
+            + Прайс-листтен тапсырыс беру
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- ── АДМИН / МЕНЕДЖЕР КӨРІНІСІ ── -->
+      <ng-container *ngIf="role() !== 'distributor'">
+        <div class="section-head">
+          <div>
+            <h2>Тапсырыстар</h2>
+          </div>
+          <div class="head-actions">
+            <select [ngModel]="selectedDistributorId()" (ngModelChange)="selectedDistributorId.set(+$event)">
+              <option value="0">— Барлық дистрибьюторлар —</option>
+              <option *ngFor="let item of visibleDistributors()" [value]="item.id">{{ item.company }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Ай бойынша фильтр -->
+        <div class="month-tabs-section">
+          <div class="month-tabs">
+            <button type="button" class="month-tab"
+              [class.active]="managerOrderMonth() === 'all'"
+              (click)="managerOrderMonth.set('all')">
+              Барлығы
+              <span class="mtab-badge">{{ sortedVisibleOrders().length }}</span>
+            </button>
+            <button type="button" class="month-tab"
+              *ngFor="let m of managerAvailableMonths()"
+              [class.active]="managerOrderMonth() === m"
+              [class.has-data]="true"
+              (click)="managerOrderMonth.set(m)">
+              {{ monthLabel(m) }}
+              <span class="mtab-badge"
+                [class.mtab-badge-pending]="managerOrderMonthCounts()[m] > 0">
+                {{ managerOrderMonthCounts()[m] }}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Назар аударуды қажет (pending + draft) -->
+        <div class="pending-alert-bar" *ngIf="pendingOrders().length > 0">
+          <span class="pending-dot"></span>
+          <strong>{{ pendingOrders().length }} тапсырыс расталуды күтуде</strong>
+          <span style="opacity:.7; margin-left:8px; font-size:13px;">
+            ({{ pendingOrders().length }} — {{ pendingOrders()[0].status === 'draft' ? 'лимит асты' : 'жаңа тапсырыс' }})
+          </span>
+        </div>
+
+        <div class="entry-card" *ngIf="role() === 'admin'">
+          <label>Кітап
+            <select [(ngModel)]="orderProductId">
+              <option *ngFor="let product of products().slice(0, 80)" [value]="product.id">{{ product.name }}</option>
+            </select>
+          </label>
+          <label>Саны
+            <input type="number" min="1" [(ngModel)]="orderQty">
+          </label>
+          <button type="button" (click)="createOrder()">Жылдам тапсырыс</button>
+        </div>
+      </ng-container>
+
+      <div class="orders-split" *ngIf="role() !== 'distributor' || distributorCurrentMonthOrders().length > 0">
+        <div class="orders-list-panel">
+          <table>
+            <thead>
+              <tr>
+                <th>Нөмір</th>
+                <th *ngIf="role() !== 'distributor'">Дистрибьютор</th>
+                <th>Статус</th>
+                <th>Сома</th>
+                <th>Күні</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let order of (role() === 'distributor' ? distributorCurrentMonthOrders() : adminManagerOrders())"
+                [class.row-selected]="selectedOrderId() === order.id"
+                (click)="openOrder(order.id)"
+              >
+                <td class="order-num">{{ order.id }}</td>
+                <td *ngIf="role() !== 'distributor'">{{ orderDistributor(order).company }}</td>
+                <td>
+                  <span class="badge"
+                    [class.badge-pending]="order.status === 'pending'"
+                    [class.badge-confirmed]="order.status === 'confirmed'"
+                    [class.badge-shipped]="order.status === 'shipped'"
+                    [class.badge-delivered]="order.status === 'delivered'"
+                    [class.danger]="order.status === 'draft' || order.status === 'cancelled'"
+                  >{{ statusLabel(order.status) }}</span>
+                </td>
+                <td>{{ order.amount | kzt }}</td>
+                <td>{{ order.createdAt | date:'dd.MM' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="order-detail-panel" *ngIf="selectedOrder()">
+          <div class="order-detail-head">
+            <div>
+              <span class="order-detail-num">{{ selectedOrder()!.id }}</span>
+              <p>{{ orderDistributor(selectedOrder()!).company }} · {{ orderDistributor(selectedOrder()!).city }}</p>
+              <small>{{ selectedOrder()!.createdAt | date:'dd.MM.yyyy' }}</small>
+            </div>
+            <span class="badge"
+              [class.badge-pending]="selectedOrder()!.status === 'pending'"
+              [class.badge-confirmed]="selectedOrder()!.status === 'confirmed'"
+              [class.badge-shipped]="selectedOrder()!.status === 'shipped'"
+              [class.badge-delivered]="selectedOrder()!.status === 'delivered'"
+              [class.danger]="selectedOrder()!.status === 'draft' || selectedOrder()!.status === 'cancelled'"
+            >{{ statusLabel(selectedOrder()!.status) }}</span>
+          </div>
+
+          <div class="fin-cards">
+            <article>
+              <span>Жеңілдіксіз</span>
+              <strong>{{ orderBaseTotal(selectedOrder()!) | kzt }}</strong>
+            </article>
+            <article>
+              <span>Жеңілдік</span>
+              <strong class="discount-amt">-{{ orderDiscountAmount(selectedOrder()!) | kzt }}</strong>
+            </article>
+            <article>
+              <span>Соңғы сома</span>
+              <strong class="final-amt">{{ selectedOrder()!.amount | kzt }}</strong>
+            </article>
+          </div>
+
+          <div class="detail-table-wrap">
+            <div class="detail-table-head">
+              <strong>Кітаптар тізімі ({{ selectedOrder()!.items.length }} атау)</strong>
+              <div class="sort-btns">
+                <button type="button" [class.active]="orderItemSort() === 'name'" (click)="orderItemSort.set('name')">Атауы</button>
+                <button type="button" [class.active]="orderItemSort() === 'qty'" (click)="orderItemSort.set('qty')">Саны</button>
+                <button type="button" [class.active]="orderItemSort() === 'amount'" (click)="orderItemSort.set('amount')">Сома</button>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Кітап</th>
+                  <th>Баспа</th>
+                  <th>Жеңілдік</th>
+                  <th>Бағам</th>
+                  <th>Саны</th>
+                  <th>Жол сомасы</th>
+                  <th *ngIf="canEditOrder(selectedOrder()!)"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let item of sortedOrderItems(); let i = index">
+                  <td>{{ i + 1 }}</td>
+                  <td>
+                    <strong>{{ item.name }}</strong>
+                    <small style="display:block;color:#66736e">{{ item.barcode }}</small>
+                  </td>
+                  <td>{{ item.publisher }}</td>
+                  <td>{{ item.discount | percent }}</td>
+                  <td>{{ item.unitPrice | kzt }}</td>
+                  <td>
+                    <input *ngIf="canEditOrder(selectedOrder()!)" type="number" class="qty-edit-input" min="1"
+                      [ngModel]="item.qty"
+                      (ngModelChange)="updateOrderItemQty(selectedOrder()!.id, item.productId, +$event)">
+                    <span *ngIf="!canEditOrder(selectedOrder()!)">{{ item.qty }}</span>
+                  </td>
+                  <td><strong>{{ item.amount | kzt }}</strong></td>
+                  <td *ngIf="canEditOrder(selectedOrder()!)">
+                    <button type="button" class="rm-btn" (click)="removeOrderItem(selectedOrder()!.id, item.productId)">×</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <button type="button" class="add-item-btn" *ngIf="canAddItem(selectedOrder()!)" (click)="addItemModal.set(true)">
+              + Кітап қосу
+            </button>
+          </div>
+
+          <div class="timeline">
+            <strong>Статус тарихы</strong>
+            <div class="timeline-items">
+              <div *ngFor="let h of selectedOrder()!.history" class="tl-item">
+                <div class="tl-dot"></div>
+                <div class="tl-content">
+                  <span class="badge badge-sm"
+                    [class.badge-pending]="h.status === 'pending'"
+                    [class.badge-confirmed]="h.status === 'confirmed'"
+                    [class.badge-shipped]="h.status === 'shipped'"
+                    [class.badge-delivered]="h.status === 'delivered'"
+                    [class.danger]="h.status === 'draft' || h.status === 'cancelled'"
+                  >{{ statusLabel(h.status) }}</span>
+                  <span>{{ h.text }}</span>
+                  <small>{{ h.date | date:'dd.MM.yyyy' }}</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="order-actions" *ngIf="role() === 'manager' || role() === 'admin'">
+            <!-- Draft (лимит асты) — менеджер қолмен растай алады -->
+            <button type="button" class="btn-confirm btn-override"
+              *ngIf="selectedOrder()!.status === 'draft'"
+              (click)="confirmOrder(selectedOrder()!.id)"
+              title="Лимиттен асқан — қолмен растау">
+              ⚠️ Лимит асты — растау
+            </button>
+            <!-- Pending — қалыпты растау -->
+            <button type="button" class="btn-confirm"
+              *ngIf="selectedOrder()!.status === 'pending'"
+              (click)="confirmOrder(selectedOrder()!.id)">
+              ✓ Растау
+            </button>
+            <!-- Confirmed — жөнелту + накладной -->
+            <button type="button" class="btn-ship-nakladnoy"
+              *ngIf="selectedOrder()!.status === 'confirmed'"
+              (click)="openShipModal()">
+              📦 Жөнелту + Накладной
+            </button>
+            <button type="button" class="btn-deliver"
+              *ngIf="selectedOrder()!.status === 'shipped'"
+              (click)="deliverOrder(selectedOrder()!.id)">
+              ✓ Жеткізілді
+            </button>
+            <button type="button" class="btn-ghost"
+              *ngIf="role() === 'admin' && (selectedOrder()!.status === 'pending' || selectedOrder()!.status === 'draft')"
+              (click)="cancelOrder(selectedOrder()!.id)">Бас тарту</button>
+          </div>
+
+          <!-- Бұрын жөнелтілген тапсырыстың накладнойын қайта шығару -->
+          <div class="order-actions"
+            *ngIf="selectedOrder()!.status === 'shipped' || selectedOrder()!.status === 'delivered'">
+            <button type="button" class="btn-ship-nakladnoy"
+              (click)="generateNakladnoy(selectedOrder()!)">
+              📄 Накладнаны қайта шығару
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Кітап қосу модалы -->
+      <div class="modal-overlay" *ngIf="addItemModal() && selectedOrder()">
+        <div class="modal">
+          <div class="modal-head">
+            <h3>Кітап қосу</h3>
+            <button type="button" class="modal-close" (click)="addItemModal.set(false)">×</button>
+          </div>
+          <input type="search" placeholder="Кітап атауын іздеңіз..."
+            class="modal-search"
+            [ngModel]="addItemQuery()"
+            (ngModelChange)="addItemQuery.set($event)">
+          <div class="modal-product-list">
+            <label *ngFor="let p of addItemFilteredProducts()" class="modal-prod-item">
+              <input type="radio" name="addProd" [value]="p.id" [(ngModel)]="addItemProductId">
+              <span>
+                <strong>{{ p.name }}</strong>
+                <small>{{ p.publisher }} · {{ myPrice(p) | kzt }}</small>
+              </span>
+            </label>
+          </div>
+          <label class="modal-field-label">
+            Саны
+            <input type="number" min="1" [(ngModel)]="addItemQty" class="modal-qty-input">
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="btn-confirm" (click)="confirmAddItem()">Қосу</button>
+            <button type="button" class="btn-ghost" (click)="addItemModal.set(false)">Бас тарту</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Жөнелту модалы -->
+      <div class="modal-overlay" *ngIf="shipModal() && selectedOrder()">
+        <div class="modal">
+          <div class="modal-head">
+            <h3>Жөнелту — {{ selectedOrder()!.id }}</h3>
+            <button type="button" class="modal-close" (click)="shipModal.set(false)">×</button>
+          </div>
+          <div class="ship-checklist">
+            <div class="check-row" [class.check-ok]="selectedOrder()!.status === 'confirmed'">
+              <span>Тапсырыс confirmed ма?</span>
+              <b>{{ selectedOrder()!.status === 'confirmed' ? 'OK' : 'Жоқ' }}</b>
+            </div>
+            <div class="check-row" [class.check-ok]="selectedOrder()!.items.length > 0">
+              <span>Кітаптар бар ма?</span>
+              <b>{{ selectedOrder()!.items.length > 0 ? 'OK' : 'Бос' }}</b>
+            </div>
+            <div class="check-row" [class.check-ok]="orderDistributor(selectedOrder()!).debt <= orderDistributor(selectedOrder()!).creditLimit">
+              <span>Лимит ішінде ме?</span>
+              <b>{{ orderDistributor(selectedOrder()!).debt <= orderDistributor(selectedOrder()!).creditLimit ? 'OK' : 'Асты' }}</b>
+            </div>
+          </div>
+          <label class="modal-field-label">
+            Күтілетін жеткізу күні
+            <input type="date" [(ngModel)]="shipDate" class="modal-qty-input">
+          </label>
+          <label class="modal-field-label">
+            Трек нөмір (міндетті емес)
+            <input type="text" [(ngModel)]="trackingNumber" class="modal-qty-input" placeholder="Тасымал нөмірі">
+          </label>
+          <label class="modal-field-label">
+            Ескертпе
+            <textarea [(ngModel)]="shipNotes" class="modal-qty-input" rows="2"></textarea>
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="btn-ship"
+              [disabled]="selectedOrder()!.status !== 'confirmed'"
+              (click)="confirmShip()">Жөнелтуді растау</button>
+            <button type="button" class="btn-ghost" (click)="shipModal.set(false)">Жабу</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ DEBTS ══ -->
+    <section class="screen" *ngIf="activeScreen() === 'debts'">
+      <div class="section-head">
+        <div>
+          <h2>Қарыз және лимит жүйесі</h2>
+        </div>
+      </div>
+
+      <!-- Жалпы қорытынды -->
+      <div class="debt-summary-strip">
+        <article>
+          <span>Жалпы қарыз</span>
+          <strong class="debt-total-val">{{ totalDebt() | kzt }}</strong>
+        </article>
+        <article>
+          <span>Тіркелген төлемдер</span>
+          <strong class="paid-total-val">{{ totalPaid() | kzt }}</strong>
+        </article>
+        <article>
+          <span>Дистрибьюторлар саны</span>
+          <strong>{{ visibleDistributors().length }}</strong>
+        </article>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Дистрибьютор</th>
+            <th>Қала</th>
+            <th>Бастапқы қарыз</th>
+            <th>Төленді</th>
+            <th>Нақты қарыз</th>
+            <th>Лимит</th>
+            <th>Статус</th>
+            <th *ngIf="role() === 'admin' || role() === 'manager'"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of visibleDistributors()">
+            <td><strong>{{ item.company }}</strong></td>
+            <td>{{ item.city }}</td>
+            <td class="muted">{{ (item.debt + (paymentsByDist().get(item.id) ?? 0)) | kzt }}</td>
+            <td class="paid-cell">
+              <span *ngIf="(paymentsByDist().get(item.id) ?? 0) > 0">
+                −{{ paymentsByDist().get(item.id) | kzt }}
+              </span>
+              <span *ngIf="!(paymentsByDist().get(item.id) ?? 0)" class="muted">—</span>
+            </td>
+            <td>
+              <strong [class.overdue]="item.debt > item.creditLimit">
+                {{ item.debt | kzt }}
+              </strong>
+            </td>
+            <td>{{ item.creditLimit | kzt }}</td>
+            <td>
+              <span class="badge" [class.danger]="item.debt > item.creditLimit" [class.warn]="item.debt > item.creditLimit * 0.8 && item.debt <= item.creditLimit">
+                {{ item.debt > item.creditLimit ? 'Лимит асты' : item.debt > item.creditLimit * 0.8 ? 'Ескерту' : 'Қалыпты' }}
+              </span>
+            </td>
+            <td *ngIf="role() === 'admin' || role() === 'manager'">
+              <button type="button" class="btn-pay" (click)="openPaymentModal(item.id)">+ Төлем</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Төлемдер тарихы -->
+      <div class="payment-history">
+        <div class="pay-hist-header">
+          <h3>Төлемдер тарихы
+            <span class="pay-hist-count" *ngIf="payments().length > 0">({{ payments().length }})</span>
+          </h3>
+          <div class="pay-filter-row">
+            <label class="pay-filter-label" *ngIf="role() === 'admin' || role() === 'manager'">
+              Дистрибьютор бойынша:
+              <select class="pay-filter-select"
+                [ngModel]="paymentFilterDistId()"
+                (ngModelChange)="paymentFilterDistId.set(+$event)">
+                <option value="0">— Барлығы —</option>
+                <option *ngFor="let d of visibleDistributors()" [value]="d.id">{{ d.company }}</option>
+              </select>
+            </label>
+            <span class="pay-filter-total" *ngIf="filteredPayments().length > 0">
+              Жиын: <strong class="paid-cell">{{ paymentTotalByFilter() | kzt }}</strong>
+            </span>
+          </div>
+        </div>
+
+        <div class="pay-empty-state" *ngIf="filteredPayments().length === 0">
+          <span>💳</span>
+          <p *ngIf="payments().length === 0">Әзірге төлем тіркелмеген</p>
+          <p *ngIf="payments().length > 0">Бұл дистрибьютор бойынша төлем жоқ</p>
+        </div>
+
+        <table class="pay-hist-table" *ngIf="filteredPayments().length > 0">
+          <thead>
+            <tr>
+              <th>Күні</th>
+              <th>Дистрибьютор</th>
+              <th>Сома</th>
+              <th>Ескертпе</th>
+              <th *ngIf="role() === 'admin' || role() === 'manager'"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of filteredPayments()">
+              <td>{{ p.date }}</td>
+              <td><strong>{{ getDistributorById(p.distributorId)?.company }}</strong></td>
+              <td><strong class="paid-cell">{{ p.amount | kzt }}</strong></td>
+              <td class="muted">{{ p.note || '—' }}</td>
+              <td *ngIf="role() === 'admin' || role() === 'manager'">
+                <button type="button" class="btn-del-payment"
+                  title="Жою"
+                  (click)="deletePayment(p.id)">✕</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Payment modal -->
+    <div class="modal-overlay" *ngIf="paymentModalOpen()">
+      <div class="modal">
+        <div class="modal-head">
+          <h3>Төлем тіркеу — {{ getDistributorById(paymentDistId()!)?.company }}</h3>
+          <button type="button" class="modal-close" (click)="paymentModalOpen.set(false)">✕</button>
+        </div>
+        <label class="modal-field-label">
+          Сома (₸)
+          <input type="number" class="modal-qty-input" [(ngModel)]="paymentAmountStr" placeholder="1 000 000" min="1">
+        </label>
+        <label class="modal-field-label">
+          Күні
+          <input type="date" class="modal-qty-input" [(ngModel)]="paymentDateStr">
+        </label>
+        <label class="modal-field-label">
+          Ескертпе (міндетті емес)
+          <input type="text" class="modal-qty-input" [(ngModel)]="paymentNoteStr" placeholder="Банктік аударым, кассалық...">
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn-confirm" (click)="savePayment()">Сақтау</button>
+          <button type="button" class="btn-ghost" (click)="paymentModalOpen.set(false)">Бас тарту</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Message modal -->
+    <div class="modal-overlay" *ngIf="messageModalOpen()">
+      <div class="modal">
+        <div class="modal-head">
+          <h3>Хабарлама жіберу — {{ getDistributorById(messageDistId()!)?.company }}</h3>
+          <button type="button" class="modal-close" (click)="messageModalOpen.set(false)">✕</button>
+        </div>
+        <label class="modal-field-label">
+          Хабарлама мәтіні
+          <textarea class="modal-qty-input" rows="4" [(ngModel)]="messageText"
+            placeholder="Мысалы: сіздің тапсырысыңыздағы бірнеше кітап басылымда жоқ, екі күн кідіріс болады"></textarea>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn-confirm" (click)="sendMessage()">Жіберу</button>
+          <button type="button" class="btn-ghost" (click)="messageModalOpen.set(false)">Бас тарту</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ USERS ══ -->
+    <section class="screen" *ngIf="activeScreen() === 'users'">
+      <div class="section-head">
+        <div>
+          <h2>Пайдаланушылар</h2>
+          <small class="result-count">{{ accounts().length }} аккаунт</small>
+        </div>
+        <button type="button" (click)="openAccountModal()">+ Жаңа пайдаланушы</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Аты</th>
+            <th>Логин</th>
+            <th>Рөл</th>
+            <th>Дистрибьютор</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let acc of accounts()">
+            <td class="muted">{{ acc.id }}</td>
+            <td><strong>{{ acc.name }}</strong></td>
+            <td><code class="login-code">{{ acc.login }}</code></td>
+            <td>
+              <span class="badge role-badge"
+                [class.role-admin]="acc.role === 'admin'"
+                [class.role-manager]="acc.role === 'manager'"
+                [class.role-dist]="acc.role === 'distributor'">
+                {{ acc.role }}
+              </span>
+            </td>
+            <td>{{ acc.distributorId ? (getDistributorById(acc.distributorId)?.company ?? '—') : '—' }}</td>
+            <td class="user-row-actions">
+              <button type="button" class="btn-edit-sm" (click)="editAccount(acc)">Өңдеу</button>
+              <button type="button" class="btn-del-sm" *ngIf="acc.id !== 1" (click)="deleteAccount(acc.id)">Өшіру</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Account modal -->
+    <div class="modal-overlay" *ngIf="accountModal()">
+      <div class="modal acc-modal">
+        <div class="modal-head">
+          <h3>{{ editingAccountId ? 'Аккаунт өңдеу' : 'Жаңа пайдаланушы' }}</h3>
+          <button type="button" class="modal-close" (click)="accountModal.set(false)">✕</button>
+        </div>
+        <label class="modal-field-label">
+          Аты
+          <input class="modal-qty-input" [(ngModel)]="newAccName" placeholder="Paidaly — Астана">
+        </label>
+        <label class="modal-field-label">
+          Логин
+          <input class="modal-qty-input" [(ngModel)]="newAccLogin" placeholder="astana" autocomplete="off">
+        </label>
+        <label class="modal-field-label">
+          {{ editingAccountId ? 'Жаңа пароль (бос = өзгермейді)' : 'Пароль' }}
+          <input type="password" class="modal-qty-input" [(ngModel)]="newAccPassword"
+            [placeholder]="editingAccountId ? '●●●●●●●● (бос қалдыруға болады)' : 'kitapal2026'"
+            autocomplete="new-password">
+        </label>
+        <label class="modal-field-label">
+          Рөл
+          <select class="modal-qty-input" [(ngModel)]="newAccRole">
+            <option value="admin">Admin</option>
+            <option value="manager">Manager</option>
+            <option value="distributor">Distributor</option>
+          </select>
+        </label>
+        <label class="modal-field-label" *ngIf="newAccRole === 'distributor'">
+          Дистрибьютор
+          <select class="modal-qty-input" [(ngModel)]="newAccDistributorId">
+            <option *ngFor="let d of distributors()" [value]="d.id">{{ d.company }} — {{ d.city }}</option>
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn-confirm" (click)="saveAccount()">Сақтау</button>
+          <button type="button" class="btn-ghost" (click)="accountModal.set(false)">Бас тарту</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ NOTIFICATIONS ══ -->
+    <section class="screen" *ngIf="activeScreen() === 'notifications'">
+      <div class="section-head">
+        <div>
+          <h2>Хабарламалар</h2>
+          <small class="result-count">{{ computedNotifications().length }} хабарлама</small>
+        </div>
+      </div>
+
+      <div class="notif-list" *ngIf="computedNotifications().length > 0">
+        <article class="notif-item" *ngFor="let n of computedNotifications()"
+          [class.notif-danger]="n.type === 'danger'"
+          [class.notif-warning]="n.type === 'warning'"
+          [class.notif-success]="n.type === 'success'"
+          [class.notif-info]="n.type === 'info'">
+          <div class="notif-icon">
+            <span *ngIf="n.type === 'danger'">🔴</span>
+            <span *ngIf="n.type === 'warning'">🟡</span>
+            <span *ngIf="n.type === 'success'">🟢</span>
+            <span *ngIf="n.type === 'info'">🔵</span>
+          </div>
+          <div class="notif-body">
+            <strong class="notif-title">{{ n.title }}</strong>
+            <p class="notif-text">{{ n.body }}</p>
+            <small class="notif-date">{{ n.date | date:'dd.MM.yyyy' }}</small>
+          </div>
+        </article>
+      </div>
+
+      <div class="notif-empty" *ngIf="computedNotifications().length === 0">
+        <div class="notif-empty-icon">✓</div>
+        <p>Барлық жақсы, белсенді хабарлама жоқ</p>
+      </div>
+    </section>
+
+    <!-- ══ EXCEL ══ -->
+    <section class="screen simple-screen" *ngIf="activeScreen() === 'excel'">
+      <h2>Excel импорт / экспорт</h2>
+      <p>Ескі Excel файлдағы парақшалар discount_groups, product_discount_overrides, order_items және debts кестелерімен сәйкестендіріледі.</p>
+      <div class="chips"><span>SheetJS xlsx</span><span>Штрихкод арқылы табу</span><span>PDF накладная</span></div>
+    </section>
+
+    <!-- ══ SECURITY ══ -->
+    <section class="screen simple-screen" *ngIf="activeScreen() === 'security'">
+      <h2>Supabase RLS қауіпсіздік</h2>
+      <p>Frontend-та жасыру жеткіліксіз: distributor A distributor B деректерін көрмеуі үшін барлық кестелерде RLS қосылады.</p>
+      <div class="chips"><span>Auth JWT</span><span>Route Guard</span><span>RLS Policy</span><span>Audit log</span></div>
+    </section>
+
+    <!-- ══ PRODUCT EDIT MODAL ══ -->
+    <div class="modal-overlay" *ngIf="editingProductId()">
+      <div class="modal acc-modal">
+        <div class="modal-head">
+          <h3>Кітапты өңдеу</h3>
+          <button type="button" class="modal-close" (click)="editingProductId.set(null)">✕</button>
+        </div>
+        <label class="modal-field-label">
+          Кітап атауы
+          <input class="modal-qty-input" [(ngModel)]="editProdName">
+        </label>
+        <label class="modal-field-label">
+          Баспасы
+          <input class="modal-qty-input" [(ngModel)]="editProdPublisher">
+        </label>
+        <label class="modal-field-label">
+          Штрихкод / ISBN
+          <input class="modal-qty-input" [(ngModel)]="editProdBarcode">
+        </label>
+        <label class="modal-field-label">
+          Санаты
+          <input class="modal-qty-input" [(ngModel)]="editProdCategory">
+        </label>
+        <label class="modal-field-label">
+          Негізгі баға (₸)
+          <input type="number" class="modal-qty-input" [(ngModel)]="editProdBasePrice">
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn-confirm" (click)="saveEditProduct()">Сақтау</button>
+          <button type="button" class="btn-ghost" (click)="editingProductId.set(null)">Бас тарту</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PROFILE DRAWER ══ -->
+  <div class="profile-overlay" *ngIf="profileOpen()" (click)="profileOpen.set(false)"></div>
+  <div class="profile-drawer" *ngIf="profileOpen()">
+    <div class="profile-drawer-header">
+      <div class="profile-drawer-av">{{ (currentUser()?.name ?? email).charAt(0).toUpperCase() }}</div>
+      <div class="profile-drawer-info">
+        <strong>{{ currentUser()?.name ?? email }}</strong>
+        <span class="badge role-badge"
+          [class.role-admin]="role() === 'admin'"
+          [class.role-manager]="role() === 'manager'"
+          [class.role-dist]="role() === 'distributor'">{{ role() }}</span>
+      </div>
+      <button type="button" class="modal-close" (click)="profileOpen.set(false)">✕</button>
+    </div>
+
+    <div class="profile-session-badge">
+      <span>🔐 JWT session — 8 сағат</span>
+    </div>
+
+    <div class="profile-tabs">
+      <button type="button" [class.active]="profileTab() === 'password'" (click)="profileTab.set('password')">Пароль</button>
+      <button type="button" [class.active]="profileTab() === 'notifications'" (click)="profileTab.set('notifications')">Хабарламалар</button>
+      <button type="button" [class.active]="profileTab() === 'language'" (click)="profileTab.set('language')">Тіл</button>
+    </div>
+
+    <!-- Пароль өзгерту -->
+    <div class="profile-tab-content" *ngIf="profileTab() === 'password'">
+      <label class="modal-field-label">
+        Ағымдағы пароль
+        <input type="password" class="modal-qty-input" [(ngModel)]="currentPwd" placeholder="••••••••">
+      </label>
+      <label class="modal-field-label">
+        Жаңа пароль
+        <input type="password" class="modal-qty-input" [(ngModel)]="newPwd" placeholder="••••••••">
+      </label>
+      <label class="modal-field-label">
+        Жаңа паролді растау
+        <input type="password" class="modal-qty-input" [(ngModel)]="confirmPwd" placeholder="••••••••">
+      </label>
+      <div *ngIf="pwdMsg" class="pwd-msg" [class.pwd-ok]="pwdMsgType === 'success'">{{ pwdMsg }}</div>
+      <button type="button" class="btn-confirm profile-save-btn" (click)="changePassword()">Сақтау</button>
+    </div>
+
+    <!-- Хабарламалар баптаулары -->
+    <div class="profile-tab-content" *ngIf="profileTab() === 'notifications'">
+      <div class="profile-notif-row">
+        <div>
+          <strong>Push хабарламалар</strong>
+          <small>Жаңа тапсырыс, лимит ескертулері</small>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" [ngModel]="notificationsEnabled()" (ngModelChange)="notificationsEnabled.set($event)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="profile-notif-info" *ngIf="notificationsEnabled()">
+        <span class="badge" style="background:#e6f4eb;color:#1f6d3e">Белсенді</span>
+        <small>Қарыз, тапсырыс және мақсат туралы хабарламалар қосылған</small>
+      </div>
+      <div class="profile-notif-info" *ngIf="!notificationsEnabled()">
+        <span class="badge danger">Өшірулі</span>
+        <small>Барлық хабарламалар тоқтатылған</small>
+      </div>
+    </div>
+
+    <!-- Тіл таңдау -->
+    <div class="profile-tab-content" *ngIf="profileTab() === 'language'">
+      <div class="lang-options">
+        <button type="button" class="lang-btn" [class.active]="selectedLanguage() === 'kz'" (click)="selectedLanguage.set('kz')">
+          <span>🇰🇿</span>
+          <div><strong>Қазақша</strong><small>Негізгі тіл</small></div>
+        </button>
+        <button type="button" class="lang-btn" [class.active]="selectedLanguage() === 'ru'" (click)="selectedLanguage.set('ru')">
+          <span>🇷🇺</span>
+          <div><strong>Русский</strong><small>Орыс тілі</small></div>
+        </button>
+        <button type="button" class="lang-btn" [class.active]="selectedLanguage() === 'en'" (click)="selectedLanguage.set('en')">
+          <span>🇬🇧</span>
+          <div><strong>English</strong><small>Ағылшын тілі</small></div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Рөл ақпараты -->
+    <div class="profile-role-info" *ngIf="role() === 'admin' || role() === 'manager'">
+      <strong>Рөл бойынша қолжетімділік</strong>
+      <ul class="check-list" style="margin:12px 0 0">
+        <li>Admin: барлық дерек</li>
+        <li>Manager: өз дистрибьюторлары</li>
+        <li>Distributor: тек өз тапсырысы</li>
+      </ul>
+    </div>
+
+    <div class="profile-drawer-footer">
+      <button type="button" class="logout-drawer-btn" (click)="logout()">← Жүйеден шығу</button>
+    </div>
+  </div>
+</main>
