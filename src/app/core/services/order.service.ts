@@ -61,6 +61,28 @@ export class OrderService {
     return null;
   }
 
+  async addItem(orderId: string, productId: number, qty: number, unitPrice: number, discount: number): Promise<string | null> {
+    const { error } = await supabase.from('order_items')
+      .insert({ order_id: orderId, product_id: productId, qty, unit_price: unitPrice, discount });
+    if (error) return error.message;
+    await this.load();
+    return null;
+  }
+
+  async updateItemQty(itemId: number, qty: number): Promise<string | null> {
+    const { error } = await supabase.from('order_items').update({ qty }).eq('id', itemId);
+    if (error) return error.message;
+    await this.load();
+    return null;
+  }
+
+  async removeItem(itemId: number): Promise<string | null> {
+    const { error } = await supabase.from('order_items').delete().eq('id', itemId);
+    if (error) return error.message;
+    await this.load();
+    return null;
+  }
+
   private async addHistory(orderId: string, status: OrderStatus, note: string): Promise<void> {
     await supabase.from('order_history').insert({ order_id: orderId, status, note });
   }

@@ -71,4 +71,11 @@ for (const [login, password, fullName, role, company] of accounts) {
   else console.log(`OK ${email} (${role}${company ? ' → ' + company : ''})`);
 }
 
+// Assign every distributor to the manager (the original setup had a single manager, Маржан).
+const { data: mgr } = await admin.from('profiles').select('id').eq('role', 'manager').limit(1).maybeSingle();
+if (mgr) {
+  const { error } = await admin.from('distributors').update({ manager_id: mgr.id }).is('manager_id', null);
+  console.log('assign manager to distributors:', error ? error.message : 'OK');
+}
+
 console.log('Done.');

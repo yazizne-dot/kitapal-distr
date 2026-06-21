@@ -52,6 +52,7 @@ type Order = {
 };
 
 type OrderItem = {
+  id?: number; // order_items.id — used for item edit/remove service calls
   productId: number;
   name: string;
   barcode: string;
@@ -465,7 +466,7 @@ export class AppComponent implements OnInit {
       id: o.order_code ?? o.id, uuid: o.id, distributorId: o.distributor_id,
       status: o.status, amount: o.amount, createdAt: o.created_at,
       items: o.items.map(i => ({
-        productId: i.product_id, name: i.name ?? '', barcode: i.barcode ?? '',
+        id: i.id, productId: i.product_id, name: i.name ?? '', barcode: i.barcode ?? '',
         publisher: i.publisher ?? '', qty: i.qty, unitPrice: i.unit_price,
         discount: i.discount, amount: i.amount,
       })),
@@ -1114,70 +1115,39 @@ export class AppComponent implements OnInit {
     return (this.role() === 'admin' || this.role() === 'manager') && ['pending', 'draft'].includes(order.status);
   }
 
-  removeOrderItem(orderId: string, productId: number): void {
-    this.orders.update(orders =>
-      orders.map(order => {
-        if (order.id !== orderId) return order;
-        const items = order.items.filter(item => item.productId !== productId);
-        const amount = items.reduce((sum, item) => sum + item.amount, 0);
-        return {
-          ...order, items, amount,
-          history: [...order.history, { date: '2026-06-10', status: order.status, text: 'Менеджер кітапты алып тастады' }]
-        };
-      })
-    );
+  async removeOrderItem(orderId: string, productId: number): Promise<void> {
+    const order = this.orders().find(o => o.id === orderId);
+    const item = order?.items.find(i => i.productId === productId);
+    if (!item?.id) return;
+    await this.orderService.removeItem(item.id);
+    await this.reloadAll();
   }
 
-  updateOrderItemQty(orderId: string, productId: number, newQty: number): void {
-    const qty = Math.max(1, Math.round(newQty) || 1);
-    this.orders.update(orders =>
-      orders.map(order => {
-        if (order.id !== orderId) return order;
-        const items = order.items.map(item =>
-          item.productId === productId
-            ? { ...item, qty, amount: item.unitPrice * qty }
-            : item
-        );
-        const amount = items.reduce((sum, item) => sum + item.amount, 0);
-        return {
-          ...order, items, amount,
-          history: [...order.history, { date: '2026-06-10', status: order.status, text: 'Менеджер кітап санын өзгертті' }]
-        };
-      })
-    );
+  async updateOrderItemQty(orderId: string, productId: number, newQty: number): Promise<void> {
+    const order = this.orders().find(o => o.id === orderId);
+    const item = order?.items.find(i => i.productId === productId);
+    if (!item?.id) return;
+    await this.orderService.updateItemQty(item.id, Math.max(1, Math.round(newQty) || 1));
+    await this.reloadAll();
   }
 
-  confirmAddItem(): void {
+  async confirmAddItem(): Promise<void> {
     const order = this.selectedOrder();
-    if (!order) return;
+    if (!order?.uuid) return;
     const product = this.products().find(p => p.id === Number(this.addItemProductId));
     if (!product) return;
     const distributor = this.orderDistributor(order);
     const discount = this.effectiveDiscount(product, distributor);
     const unitPrice = Math.round(product.basePrice * (1 - discount));
     const qty = Math.max(1, Number(this.addItemQty) || 1);
-    const amount = unitPrice * qty;
-    this.orders.update(orders =>
-      orders.map(o => {
-        if (o.id !== order.id) return o;
-        const existingIdx = o.items.findIndex(item => item.productId === product.id);
-        let items: OrderItem[];
-        if (existingIdx >= 0) {
-          items = o.items.map((item, idx) => idx === existingIdx
-            ? { ...item, qty: item.qty + qty, amount: item.amount + amount }
-            : item);
-        } else {
-          items = [...o.items, {
-            productId: product.id, name: product.name, barcode: product.barcode,
-            publisher: product.publisher, qty, unitPrice, discount, amount
-          }];
-        }
-        return {
-          ...o, items, amount: items.reduce((s, i) => s + i.amount, 0),
-          history: [...o.history, { date: '2026-06-10', status: o.status, text: `Менеджер ${product.name} × ${qty} қосты` }]
-        };
-      })
-    );
+    // If the product is already on the order, bump its qty; otherwise add a new line.
+    const existing = order.items.find(i => i.productId === product.id);
+    if (existing?.id) {
+      await this.orderService.updateItemQty(existing.id, existing.qty + qty);
+    } else {
+      await this.orderService.addItem(order.uuid, product.id, qty, unitPrice, discount);
+    }
+    await this.reloadAll();
     this.addItemModal.set(false);
     this.addItemQuery.set('');
   }
