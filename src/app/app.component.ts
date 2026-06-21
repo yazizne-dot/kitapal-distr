@@ -1,9 +1,16 @@
 import { CommonModule, DatePipe, PercentPipe } from '@angular/common';
-import { Component, computed, effect, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 // xlsx import removed — накладная is now generated as HTML (Form З-2)
-import { products as initialProducts, type Product } from './price-products';
+import { type Product } from './price-products';
 import { KztPipe } from './kzt.pipe';
+import { AuthService, loginToEmail } from './core/services/auth.service';
+import { ProductService } from './core/services/product.service';
+import { DistributorService } from './core/services/distributor.service';
+import { OrderService, decideStatus } from './core/services/order.service';
+import { PaymentService } from './core/services/payment.service';
+import { MessageService } from './core/services/message.service';
+import { NotificationService } from './core/services/notification.service';
 
 type Role = 'admin' | 'manager' | 'distributor';
 type OrderStatus = 'draft' | 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
@@ -34,6 +41,7 @@ type Distributor = {
 
 type Order = {
   id: string;
+  uuid?: string; // Supabase orders.id (PK) — used for service calls; id holds order_code for display
   distributorId: number;
   items: OrderItem[];
   status: OrderStatus;
@@ -323,7 +331,7 @@ const orders: Order[] = [
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   private readonly cityCodeMap: Record<string, string> = {
     'Астана': 'AST', 'Шымкент': 'SHY', 'Ақтау': 'AKT',
     'Қызылорда': 'KYZ', 'Тараз': 'TAR', 'Жезқазған': 'JEZ',
@@ -406,34 +414,80 @@ export class AppComponent {
   newAccRole: Role = 'distributor';
   newAccDistributorId = 1;
 
-  distributors = signal<Distributor[]>((() => {
-    try { const s = localStorage.getItem('kp_distributors'); return s ? JSON.parse(s) as Distributor[] : distributors; }
-    catch { return distributors; }
-  })());
-  products = signal<Product[]>([...initialProducts]);
-  orders = signal<Order[]>((() => {
-    try { const s = localStorage.getItem('kp_orders'); return s ? JSON.parse(s) as Order[] : orders; }
-    catch { return orders; }
-  })());
+  // Data now comes from Supabase via services (mapped to the camelCase shapes the template uses).
+  distributors = signal<Distributor[]>([]);
+  products = signal<Product[]>([]);
+  orders = signal<Order[]>([]);
 
-  constructor() {
-    // Persist orders, payments, messages to localStorage on every change
-    effect(() => { localStorage.setItem('kp_orders', JSON.stringify(this.orders())); });
-    effect(() => { localStorage.setItem('kp_payments', JSON.stringify(this.payments())); });
-    effect(() => { localStorage.setItem('kp_messages', JSON.stringify(this.messages())); });
-    effect(() => { localStorage.setItem('kp_distributors', JSON.stringify(this.distributors())); });
+  // Services
+  private authService = inject(AuthService);
+  private productService = inject(ProductService);
+  private distributorService = inject(DistributorService);
+  private orderService = inject(OrderService);
+  private paymentService = inject(PaymentService);
+  private messageService = inject(MessageService);
+  private notificationService = inject(NotificationService);
 
-    // "Есімде сақта" — алдыңғы сессиядан логин/парольді қалпына келтіру
-    try {
-      const saved = localStorage.getItem('kp_remember');
-      if (saved) {
-        const { login, password } = JSON.parse(saved);
-        this.email = login;
-        this.password = password;
-        this.rememberMe = true;
-        this.login();
-      }
-    } catch { /* сақталған дерек жоқ немесе бұзылған */ }
+  async ngOnInit(): Promise<void> {
+    // Restore an existing Supabase session, if any.
+    await this.authService.loadProfile();
+    if (this.authService.signedIn()) {
+      this.applyAuthState();
+      await this.reloadAll();
+    }
+  }
+
+  private applyAuthState(): void {
+    const profile = this.authService.profile();
+    this.role.set(this.authService.role());
+    this.currentUser.set(profile
+      ? { id: 0, name: profile.full_name, login: '', password: '', role: profile.role, distributorId: profile.distributor_id ?? undefined }
+      : null);
+    if (profile?.distributor_id != null) this.selectedDistributorId.set(profile.distributor_id);
+    this.signedIn.set(true);
+  }
+
+  // Load everything from Supabase and map snake_case rows to the camelCase view shapes.
+  private async reloadAll(): Promise<void> {
+    await Promise.all([
+      this.productService.load(),
+      this.distributorService.load(),
+      this.orderService.load(),
+      this.paymentService.load(),
+      this.messageService.load(),
+      this.notificationService.load(),
+    ]);
+    this.products.set(this.productService.products().map(p => ({
+      id: p.id, barcode: p.barcode, name: p.name, publisher: p.publisher,
+      category: p.category, basePrice: p.base_price,
+      discountOverride: p.discount_override ?? undefined,
+    })));
+    const statsById = new Map(this.distributorService.stats().map(s => [s.distributor_id, s]));
+    this.distributors.set(this.distributorService.distributors().map(d => {
+      const s = statsById.get(d.id);
+      return {
+        id: d.id, company: d.company, city: d.city, manager: '',
+        target: s?.target ?? 0, achieved: s?.achieved ?? 0,
+        discount: d.discount, creditLimit: d.credit_limit, debt: s?.debt ?? 0,
+        phone: d.phone,
+      };
+    }));
+    this.orders.set(this.orderService.orders().map(o => ({
+      id: o.order_code ?? o.id, uuid: o.id, distributorId: o.distributor_id,
+      status: o.status, amount: o.amount, createdAt: o.created_at,
+      items: o.items.map(i => ({
+        productId: i.product_id, name: i.name ?? '', barcode: i.barcode ?? '',
+        publisher: i.publisher ?? '', qty: i.qty, unitPrice: i.unit_price,
+        discount: i.discount, amount: i.amount,
+      })),
+      history: o.history.map(h => ({ date: h.changed_at, status: h.status, text: h.note })),
+    })));
+    this.payments.set(this.paymentService.payments().map(p => ({
+      id: p.id, distributorId: p.distributor_id, amount: p.amount, date: p.paid_at, note: p.note,
+    })));
+    this.messages.set(this.messageService.messages().map(m => ({
+      id: m.id, distributorId: m.distributor_id, from: '', text: m.body, date: m.created_at,
+    })));
   }
 
   adminMenu = [
@@ -471,17 +525,11 @@ export class AppComponent {
     return this.role() === 'manager' ? this.managerMenu : this.adminMenu;
   });
 
-  payments = signal<Payment[]>((() => {
-    try { const s = localStorage.getItem('kp_payments'); return s ? JSON.parse(s) as Payment[] : []; }
-    catch { return []; }
-  })());
+  payments = signal<Payment[]>([]);
 
   paymentFilterDistId = signal<number>(0); // 0 = барлығы (тек admin/manager үшін)
 
-  messages = signal<DistMessage[]>((() => {
-    try { const s = localStorage.getItem('kp_messages'); return s ? JSON.parse(s) as DistMessage[] : []; }
-    catch { return []; }
-  })());
+  messages = signal<DistMessage[]>([]);
 
   messageModalOpen = signal(false);
   messageDistId = signal<number | null>(null);
@@ -495,13 +543,9 @@ export class AppComponent {
     return map;
   });
 
-  effectiveDistributors = computed(() => {
-    const paidMap = this.paymentsByDist();
-    return this.distributors().map(d => ({
-      ...d,
-      debt: Math.max(0, d.debt - (paidMap.get(d.id) ?? 0))
-    }));
-  });
+  // debt now comes already-computed from the distributor_stats view (payments already netted),
+  // so we no longer subtract payments here — just expose distributors as-is.
+  effectiveDistributors = computed(() => this.distributors());
 
   visibleDistributors = computed(() => {
     const all = this.effectiveDistributors();
@@ -727,102 +771,36 @@ export class AppComponent {
   });
 
   // Auto-generated notifications from real data — рөл бойынша шектелген (тек өзіне қатыстысын көреді)
-  computedNotifications = computed((): AppNotif[] => {
-    const notifs: AppNotif[] = [];
-    let id = 1;
-    const visible = this.visibleDistributors();
-    visible.forEach(d => {
-      if (d.debt > d.creditLimit) {
-        notifs.push({
-          id: id++, type: 'danger',
-          title: 'Лимит асылды',
-          body: `${d.company} (${d.city}) — қарыз ${d.debt.toLocaleString('ru')} ₸, лимит ${d.creditLimit.toLocaleString('ru')} ₸`,
-          date: '2026-06-10',
-          distributorId: d.id
-        });
-      } else if (d.debt > d.creditLimit * 0.8) {
-        notifs.push({
-          id: id++, type: 'warning',
-          title: 'Лимит ескертуі',
-          body: `${d.company} (${d.city}) — лимиттің ${Math.round(d.debt / d.creditLimit * 100)}% қолданылды`,
-          date: '2026-06-10',
-          distributorId: d.id
-        });
-      }
-      const pct = d.achieved / d.target;
-      if (pct >= 0.8 && pct < 1) {
-        notifs.push({
-          id: id++, type: 'success',
-          title: 'Мақсатқа жақын',
-          body: `${d.company} — мақсаттың ${Math.round(pct * 100)}% орындалды`,
-          date: '2026-06-08',
-          distributorId: d.id
-        });
-      }
-    });
-    this.visibleOrders().filter(o => o.status === 'pending').forEach(o => {
-      const dist = visible.find(d => d.id === o.distributorId);
-      if (dist) {
-        notifs.push({
-          id: id++, type: 'info',
-          title: 'Тапсырыс расталуды күтуде',
-          body: `${o.id} — ${dist.company}, ${o.amount.toLocaleString('ru')} ₸`,
-          date: o.createdAt,
-          distributorId: dist.id
-        });
-      }
-    });
-    const visibleIds = new Set(visible.map(d => d.id));
-    this.messages().filter(m => visibleIds.has(m.distributorId)).forEach(m => {
-      const dist = visible.find(d => d.id === m.distributorId);
-      notifs.push({
-        id: id++, type: 'info',
-        title: `Хабарлама${dist ? ' — ' + dist.company : ''}`,
-        body: m.text,
-        date: m.date,
-        distributorId: m.distributorId
-      });
-    });
-    return notifs;
-  });
+  // Notifications now come from the public.notifications view (RLS already scopes them per role).
+  computedNotifications = computed((): AppNotif[] =>
+    this.notificationService.notifications().map((n, idx) => ({
+      id: idx + 1, type: n.type, title: n.title, body: n.body,
+      date: n.date, distributorId: n.distributor_id,
+    }))
+  );
 
-  login(): void {
-    const acc = this.accounts().find(
-      a => a.login === this.email.trim() && a.password === this.password
-    );
-    if (!acc) {
-      this.loginError = 'Логин немесе пароль қате';
-      return;
-    }
+  async login(): Promise<void> {
+    const err = await this.authService.login(this.email, this.password);
+    if (err) { this.loginError = err; return; }
     this.loginError = '';
-    this.role.set(acc.role);
-    this.currentUser.set(acc);
-    if (acc.distributorId != null) this.selectedDistributorId.set(acc.distributorId);
+    this.applyAuthState();
     this.activeScreen.set('overview');
-    this.signedIn.set(true);
-
-    if (this.rememberMe) {
-      localStorage.setItem('kp_remember', JSON.stringify({ login: this.email.trim(), password: this.password }));
-    } else {
-      localStorage.removeItem('kp_remember');
-    }
+    await this.reloadAll();
   }
 
-  loginDemo(role: Role): void {
-    this.role.set(role);
-    if (role === 'distributor') {
-      this.selectedDistributorId.set(1);
-      this.currentUser.set(this.accounts().find(a => a.role === 'distributor') ?? null);
-    } else if (role === 'admin') {
-      this.currentUser.set(this.accounts().find(a => a.role === 'admin') ?? null);
-    } else {
-      this.currentUser.set(this.accounts().find(a => a.role === 'manager') ?? null);
-    }
-    this.activeScreen.set('overview');
-    this.signedIn.set(true);
+  async loginDemo(role: Role): Promise<void> {
+    const creds: Record<Role, { login: string; password: string }> = {
+      admin: { login: 'admin', password: 'admin2026' },
+      manager: { login: 'marjan', password: 'manager2026' },
+      distributor: { login: 'astana', password: 'kitapal2026' },
+    };
+    this.email = creds[role].login;
+    this.password = creds[role].password;
+    await this.login();
   }
 
-  logout(): void {
+  async logout(): Promise<void> {
+    await this.authService.logout();
     this.signedIn.set(false);
     this.password = '';
     this.loginError = '';
@@ -830,16 +808,9 @@ export class AppComponent {
     this.profileOpen.set(false);
   }
 
-  changePassword(): void {
-    const user = this.currentUser();
-    if (!user) return;
+  async changePassword(): Promise<void> {
     if (!this.currentPwd || !this.newPwd || !this.confirmPwd) {
       this.pwdMsg = 'Барлық өрісті толтырыңыз';
-      this.pwdMsgType = 'error';
-      return;
-    }
-    if (user.password !== this.currentPwd) {
-      this.pwdMsg = 'Ағымдағы пароль қате';
       this.pwdMsgType = 'error';
       return;
     }
@@ -853,8 +824,8 @@ export class AppComponent {
       this.pwdMsgType = 'error';
       return;
     }
-    this.accounts.update(list => list.map(a => a.id === user.id ? { ...a, password: this.newPwd } : a));
-    this.currentUser.update(u => u ? { ...u, password: this.newPwd } : u);
+    const err = await this.authService.changePassword(this.newPwd);
+    if (err) { this.pwdMsg = err; this.pwdMsgType = 'error'; return; }
     this.pwdMsg = 'Пароль сәтті өзгертілді!';
     this.pwdMsgType = 'success';
     this.currentPwd = '';
@@ -871,17 +842,17 @@ export class AppComponent {
     this.editProdBasePrice = product.basePrice;
   }
 
-  saveEditProduct(): void {
+  async saveEditProduct(): Promise<void> {
     const id = this.editingProductId();
     if (!id) return;
-    this.products.update(list => list.map(p => p.id !== id ? p : {
-      ...p,
-      name: this.editProdName.trim() || p.name,
-      publisher: this.editProdPublisher.trim() || p.publisher,
-      barcode: this.editProdBarcode.trim() || p.barcode,
-      category: this.editProdCategory.trim() || p.category,
-      basePrice: Number(this.editProdBasePrice) > 0 ? Number(this.editProdBasePrice) : p.basePrice,
-    }));
+    const patch: Record<string, unknown> = {};
+    if (this.editProdName.trim()) patch['name'] = this.editProdName.trim();
+    if (this.editProdPublisher.trim()) patch['publisher'] = this.editProdPublisher.trim();
+    if (this.editProdBarcode.trim()) patch['barcode'] = this.editProdBarcode.trim();
+    if (this.editProdCategory.trim()) patch['category'] = this.editProdCategory.trim();
+    if (Number(this.editProdBasePrice) > 0) patch['base_price'] = Number(this.editProdBasePrice);
+    await this.productService.update(id, patch);
+    await this.reloadAll();
     this.editingProductId.set(null);
   }
 
@@ -920,21 +891,17 @@ export class AppComponent {
     this.filteredPayments().reduce((s, p) => s + p.amount, 0)
   );
 
-  deletePayment(id: number): void {
-    this.payments.update(ps => ps.filter(p => p.id !== id));
+  async deletePayment(id: number): Promise<void> {
+    await this.paymentService.remove(id);
+    await this.reloadAll();
   }
 
-  savePayment(): void {
+  async savePayment(): Promise<void> {
     const amount = parseFloat(this.paymentAmountStr);
-    if (!amount || amount <= 0 || !this.paymentDistId()) return;
-    const nextId = (this.payments().at(-1)?.id ?? 0) + 1;
-    this.payments.update(ps => [...ps, {
-      id: nextId,
-      distributorId: this.paymentDistId()!,
-      amount,
-      date: this.paymentDateStr || '2026-06-10',
-      note: this.paymentNoteStr
-    }]);
+    const distId = this.paymentDistId();
+    if (!amount || amount <= 0 || !distId) return;
+    await this.paymentService.add(distId, amount, this.paymentDateStr || '2026-06-10', this.paymentNoteStr);
+    await this.reloadAll();
     this.paymentModalOpen.set(false);
   }
 
@@ -947,11 +914,12 @@ export class AppComponent {
     this.editDiscountStr = String(Math.round(d.discount * 100));
   }
 
-  saveDiscount(distId: number): void {
+  async saveDiscount(distId: number): Promise<void> {
     if (this.role() !== 'admin') return;
     const pct = parseFloat(this.editDiscountStr);
     if (isNaN(pct) || pct < 0 || pct > 100) return;
-    this.distributors.update(ds => ds.map(d => d.id === distId ? { ...d, discount: pct / 100 } : d));
+    await this.distributorService.setDiscount(distId, pct / 100);
+    await this.reloadAll();
     this.editingDiscountDistId.set(null);
   }
 
@@ -961,18 +929,12 @@ export class AppComponent {
     this.messageModalOpen.set(true);
   }
 
-  sendMessage(): void {
+  async sendMessage(): Promise<void> {
     const distId = this.messageDistId();
     const text = this.messageText.trim();
     if (!distId || !text) return;
-    const nextId = (this.messages().at(-1)?.id ?? 0) + 1;
-    this.messages.update(ms => [...ms, {
-      id: nextId,
-      distributorId: distId,
-      from: this.currentUser()?.name ?? (this.role() === 'admin' ? 'Әкімші' : 'Менеджер'),
-      text,
-      date: '2026-06-16'
-    }]);
+    await this.messageService.send(distId, text);
+    await this.reloadAll();
     this.messageModalOpen.set(false);
   }
 
@@ -1068,42 +1030,36 @@ export class AppComponent {
     return distributor.target ? distributor.achieved / distributor.target : 0;
   }
 
-  createOrder(): void {
+  async createOrder(): Promise<void> {
     const product = this.products().find((item) => item.id === Number(this.orderProductId)) ?? this.products()[0];
     const distributor = this.selectedDistributor();
+    if (!product || !distributor) return;
     const unitPrice = this.myPrice(product);
     const discount = this.effectiveDiscount(product);
     const amount = unitPrice * this.orderQty;
-    const status: OrderStatus = distributor.debt + amount > distributor.creditLimit ? 'draft' : 'pending';
-    const id = this.nextOrderId();
-    this.orders.update((items) => [{
-      id, distributorId: distributor.id,
-      items: [{ productId: product.id, name: product.name, barcode: product.barcode, publisher: product.publisher, qty: this.orderQty, unitPrice, discount, amount }],
-      status, amount, createdAt: '2026-06-10',
-      history: [{ date: '2026-06-10', status, text: status === 'draft' ? 'Лимиттен асқандықтан черновик болып сақталды' : 'Дистрибьютор тапсырыс жіберді' }]
-    }, ...items]);
-    this.selectedOrderId.set(id);
+    const status = decideStatus(distributor.debt, amount, distributor.creditLimit);
+    await this.orderService.create(distributor.id,
+      [{ productId: product.id, qty: this.orderQty, unitPrice, discount }], status);
+    await this.reloadAll();
+    const newest = this.orders().find(o => o.distributorId === distributor.id);
+    if (newest) this.selectedOrderId.set(newest.id);
   }
 
-  createOrderFromPrice(): void {
+  async createOrderFromPrice(): Promise<void> {
     const items = this.priceDraftItems();
     if (items.length === 0) return;
     const distributor = this.selectedDistributor();
+    if (!distributor) return;
     const amount = this.priceDraftTotal();
-    const status: OrderStatus = distributor.debt + amount > distributor.creditLimit ? 'draft' : 'pending';
-    const id = this.nextOrderId();
-    this.orders.update((orders) => [{
-      id, distributorId: distributor.id,
-      items: items.map((item) => ({
-        productId: item.product.id, name: item.product.name, barcode: item.product.barcode,
-        publisher: item.product.publisher, qty: item.qty,
-        unitPrice: this.myPrice(item.product), discount: this.effectiveDiscount(item.product), amount: item.amount
-      })),
-      status, amount, createdAt: '2026-06-10',
-      history: [{ date: '2026-06-10', status, text: status === 'draft' ? 'Лимиттен асқандықтан черновик болып сақталды' : 'Дистрибьютор тапсырыс жіберді' }]
-    }, ...orders]);
+    const status = decideStatus(distributor.debt, amount, distributor.creditLimit);
+    await this.orderService.create(distributor.id, items.map((item) => ({
+      productId: item.product.id, qty: item.qty,
+      unitPrice: this.myPrice(item.product), discount: this.effectiveDiscount(item.product),
+    })), status);
+    await this.reloadAll();
     this.priceQuantities.set({});
-    this.selectedOrderId.set(id);
+    const newest = this.orders().find(o => o.distributorId === distributor.id);
+    if (newest) this.selectedOrderId.set(newest.id);
     this.activeScreen.set('orders');
   }
 
@@ -1123,41 +1079,27 @@ export class AppComponent {
     return this.distributors().find((item) => item.id === order.distributorId) ?? this.distributors()[0];
   }
 
-  updateOrderStatus(orderId: string, status: OrderStatus, text: string): void {
-    this.orders.update((orders) =>
-      orders.map((order) =>
-        order.id === orderId
-          ? { ...order, status, history: [...order.history, { date: '2026-06-10', status, text }] }
-          : order
-      )
-    );
+  async updateOrderStatus(orderId: string, status: OrderStatus, text: string): Promise<void> {
+    const order = this.orders().find(o => o.id === orderId);
+    if (!order?.uuid) return;
+    await this.orderService.setStatus(order.uuid, status, text);
+    await this.reloadAll();
   }
 
-  confirmOrder(orderId: string): void {
+  async confirmOrder(orderId: string): Promise<void> {
     const order = this.orders().find(o => o.id === orderId);
     const note = order?.status === 'draft'
       ? 'Менеджер лимиттен асқанын растады (қолмен өткізілді)'
       : 'Менеджер тапсырысты растады';
-    this.updateOrderStatus(orderId, 'confirmed', note);
+    await this.updateOrderStatus(orderId, 'confirmed', note);
   }
 
-  shipOrder(orderId: string): void {
-    this.updateOrderStatus(orderId, 'shipped', 'Менеджер тапсырысты жіберуге бекітті');
+  async shipOrder(orderId: string): Promise<void> {
+    await this.updateOrderStatus(orderId, 'shipped', 'Менеджер тапсырысты жіберуге бекітті');
   }
 
-  cancelOrder(orderId: string): void {
-    this.updateOrderStatus(orderId, 'cancelled', 'Менеджер тапсырысты қайтарды');
-  }
-
-  nextOrderId(): string {
-    const distributor = this.selectedDistributor();
-    const cityCode = this.cityCodeMap[distributor.city] ?? 'KP';
-    const prefix = `KP-${cityCode}-2606-`;
-    const maxSeq = this.orders()
-      .filter(o => o.id.startsWith(prefix))
-      .map(o => parseInt(o.id.slice(prefix.length)) || 0)
-      .reduce((max, n) => Math.max(max, n), 0);
-    return `${prefix}${String(maxSeq + 1).padStart(4, '0')}`;
+  async cancelOrder(orderId: string): Promise<void> {
+    await this.updateOrderStatus(orderId, 'cancelled', 'Менеджер тапсырысты қайтарды');
   }
 
   loadMorePrice(): void {
