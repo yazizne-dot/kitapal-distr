@@ -8,6 +8,10 @@
 //
 // Re-runnable: skips users that already exist, upserts profiles.
 import { createClient } from '@supabase/supabase-js';
+// supabase-js initializes a realtime client that needs WebSocket; Node < 22 has none.
+// We don't use realtime here, but createClient still constructs it — polyfill to satisfy it.
+import ws from 'ws';
+globalThis.WebSocket ??= ws;
 
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
