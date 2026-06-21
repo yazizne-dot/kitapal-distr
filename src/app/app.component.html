@@ -1227,7 +1227,7 @@
             <td>{{ acc.distributorId ? (getDistributorById(acc.distributorId)?.company ?? '—') : '—' }}</td>
             <td class="user-row-actions">
               <button type="button" class="btn-edit-sm" (click)="editAccount(acc)">Өңдеу</button>
-              <button type="button" class="btn-del-sm" *ngIf="acc.id !== 1" (click)="deleteAccount(acc.id)">Өшіру</button>
+              <button type="button" class="btn-del-sm" *ngIf="acc.role !== 'admin'" (click)="deleteAccount(acc.id)">Өшіру</button>
             </td>
           </tr>
         </tbody>
@@ -1269,6 +1269,7 @@
             <option *ngFor="let d of distributors()" [value]="d.id">{{ d.company }} — {{ d.city }}</option>
           </select>
         </label>
+        <p *ngIf="accountError" style="color:#c0392b;font-size:13px;margin:8px 0 0">{{ accountError }}</p>
         <div class="modal-actions">
           <button type="button" class="btn-confirm" (click)="saveAccount()">Сақтау</button>
           <button type="button" class="btn-ghost" (click)="accountModal.set(false)">Бас тарту</button>

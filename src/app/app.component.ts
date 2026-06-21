@@ -11,6 +11,7 @@ import { OrderService, decideStatus } from './core/services/order.service';
 import { PaymentService } from './core/services/payment.service';
 import { MessageService } from './core/services/message.service';
 import { NotificationService } from './core/services/notification.service';
+import { AccountService } from './core/services/account.service';
 
 type Role = 'admin' | 'manager' | 'distributor';
 type OrderStatus = 'draft' | 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
@@ -84,7 +85,7 @@ type DistMessage = {
 };
 
 type UserAccount = {
-  id: number;
+  id: string;
   name: string;
   login: string;
   password: string;
@@ -92,21 +93,7 @@ type UserAccount = {
   distributorId?: number;
 };
 
-const initialAccounts: UserAccount[] = [
-  { id: 1,  name: 'Бас Администратор',  login: 'admin',  password: 'admin2026',    role: 'admin' },
-  { id: 2,  name: 'Маржан',            login: 'marjan', password: 'manager2026',  role: 'manager' },
-  { id: 5,  name: 'Paidaly — Астана',          login: 'astana',    password: 'kitapal2026',  role: 'distributor', distributorId: 1 },
-  { id: 6,  name: 'Руханият — Ақтау',          login: 'rukhaniyat',password: 'kitapal2026',  role: 'distributor', distributorId: 2 },
-  { id: 7,  name: 'Ақтау франшиза',            login: 'aktaufr',   password: 'kitapal2026',  role: 'distributor', distributorId: 3 },
-  { id: 8,  name: 'Aidyn Kitap — Қызылорда',   login: 'kyzylorda', password: 'kitapal2026',  role: 'distributor', distributorId: 4 },
-  { id: 9,  name: 'Kitapal Oral — Орал',        login: 'oral',      password: 'kitapal2026',  role: 'distributor', distributorId: 5 },
-  { id: 10, name: 'Закария — Павлодар',         login: 'pavlodar',  password: 'kitapal2026',  role: 'distributor', distributorId: 6 },
-  { id: 11, name: 'Байгелов — Тараз',           login: 'baigelov',  password: 'kitapal2026',  role: 'distributor', distributorId: 7 },
-  { id: 12, name: 'ЖасКО — Тараз',              login: 'jasko',     password: 'kitapal2026',  role: 'distributor', distributorId: 8 },
-  { id: 13, name: 'Олжабаев — Шымкент',         login: 'shymkent',  password: 'kitapal2026',  role: 'distributor', distributorId: 9 },
-  { id: 14, name: 'Сабитова Нұртас — Алматы',   login: 'almaty',    password: 'kitapal2026',  role: 'distributor', distributorId: 10 },
-  { id: 15, name: 'Рахманов — Барахолка',        login: 'rakhmanov', password: 'kitapal2026',  role: 'distributor', distributorId: 11 },
-];
+// User accounts are now real Supabase Auth users, managed via the admin-users Edge Function.
 
 const distributors: Distributor[] = [
   { id: 1,  company: 'Paidaly',          city: 'Астана',    manager: 'Маржан', target: 42000000, achieved: 4726848,  discount: 0.45, creditLimit: 8000000,  debt: 8050087,  phone: '' },
@@ -405,9 +392,10 @@ export class AppComponent implements OnInit {
   orderQty = 10;
   orderProductId = 1;
 
-  accounts = signal<UserAccount[]>(initialAccounts);
+  accounts = signal<UserAccount[]>([]);
   accountModal = signal(false);
-  editingAccountId: number | null = null;
+  editingAccountId: string | null = null;
+  accountError = '';
   newAccName = '';
   newAccLogin = '';
   newAccPassword = '';
@@ -427,6 +415,7 @@ export class AppComponent implements OnInit {
   private paymentService = inject(PaymentService);
   private messageService = inject(MessageService);
   private notificationService = inject(NotificationService);
+  private accountService = inject(AccountService);
 
   async ngOnInit(): Promise<void> {
     // Restore an existing Supabase session, if any.
@@ -441,7 +430,7 @@ export class AppComponent implements OnInit {
     const profile = this.authService.profile();
     this.role.set(this.authService.role());
     this.currentUser.set(profile
-      ? { id: 0, name: profile.full_name, login: '', password: '', role: profile.role, distributorId: profile.distributor_id ?? undefined }
+      ? { id: profile.id, name: profile.full_name, login: '', password: '', role: profile.role, distributorId: profile.distributor_id ?? undefined }
       : null);
     if (profile?.distributor_id != null) this.selectedDistributorId.set(profile.distributor_id);
     this.signedIn.set(true);
@@ -488,6 +477,14 @@ export class AppComponent implements OnInit {
     this.messages.set(this.messageService.messages().map(m => ({
       id: m.id, distributorId: m.distributor_id, from: '', text: m.body, date: m.created_at,
     })));
+    // User management is admin-only (Edge Function rejects others).
+    if (this.role() === 'admin') {
+      await this.accountService.load();
+      this.accounts.set(this.accountService.accounts().map(a => ({
+        id: a.id, name: a.full_name, login: a.login, password: '',
+        role: a.role, distributorId: a.distributor_id ?? undefined,
+      })));
+    }
   }
 
   adminMenu = [
@@ -949,6 +946,7 @@ export class AppComponent implements OnInit {
     this.newAccPassword = '';
     this.newAccRole = 'distributor';
     this.newAccDistributorId = 1;
+    this.accountError = '';
     this.accountModal.set(true);
   }
 
@@ -959,39 +957,24 @@ export class AppComponent implements OnInit {
     this.newAccPassword = '';
     this.newAccRole = acc.role;
     this.newAccDistributorId = acc.distributorId ?? 1;
+    this.accountError = '';
     this.accountModal.set(true);
   }
 
-  saveAccount(): void {
+  async saveAccount(): Promise<void> {
     if (!this.newAccLogin.trim() || !this.newAccName.trim()) return;
-    if (this.editingAccountId != null) {
-      this.accounts.update(list =>
-        list.map(a => a.id !== this.editingAccountId ? a : {
-          ...a,
-          name: this.newAccName.trim(),
-          login: this.newAccLogin.trim(),
-          ...(this.newAccPassword ? { password: this.newAccPassword } : {}),
-          role: this.newAccRole,
-          distributorId: this.newAccRole === 'distributor' ? Number(this.newAccDistributorId) : undefined,
-        })
-      );
-    } else {
-      const nextId = Math.max(0, ...this.accounts().map(a => a.id)) + 1;
-      this.accounts.update(list => [...list, {
-        id: nextId,
-        name: this.newAccName.trim(),
-        login: this.newAccLogin.trim(),
-        password: this.newAccPassword || 'kitapal2026',
-        role: this.newAccRole,
-        distributorId: this.newAccRole === 'distributor' ? Number(this.newAccDistributorId) : undefined,
-      }]);
-    }
+    const distId = this.newAccRole === 'distributor' ? Number(this.newAccDistributorId) : null;
+    const err = this.editingAccountId != null
+      ? await this.accountService.update(this.editingAccountId, this.newAccName.trim(), this.newAccRole, distId, this.newAccPassword)
+      : await this.accountService.create(this.newAccLogin.trim(), this.newAccName.trim(), this.newAccRole, distId, this.newAccPassword);
+    if (err) { this.accountError = err; return; }
+    await this.reloadAll();
     this.accountModal.set(false);
   }
 
-  deleteAccount(id: number): void {
-    if (id === 1) return;
-    this.accounts.update(list => list.filter(a => a.id !== id));
+  async deleteAccount(id: string): Promise<void> {
+    const err = await this.accountService.remove(id);
+    if (!err) await this.reloadAll();
   }
 
   navigate(screen: string): void {
