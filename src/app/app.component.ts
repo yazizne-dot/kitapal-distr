@@ -342,6 +342,7 @@ export class AppComponent implements OnInit {
   addItemModal = signal(false);
   addItemQuery = signal('');
   shipModal = signal(false);
+  showLoginPassword = signal(false);
 
   // Profile panel
   profileOpen = signal(false);
@@ -1036,10 +1037,11 @@ export class AppComponent implements OnInit {
     if (!distributor) return;
     const amount = this.priceDraftTotal();
     const status = decideStatus(distributor.debt, amount, distributor.creditLimit);
-    await this.orderService.create(distributor.id, items.map((item) => ({
+    const err = await this.orderService.create(distributor.id, items.map((item) => ({
       productId: item.product.id, qty: item.qty,
       unitPrice: this.myPrice(item.product), discount: this.effectiveDiscount(item.product),
     })), status);
+    if (err) { console.error('createOrderFromPrice:', err); alert('Тапсырыс жіберілмеді: ' + err); return; }
     await this.reloadAll();
     this.priceQuantities.set({});
     const newest = this.orders().find(o => o.distributorId === distributor.id);
@@ -1108,18 +1110,46 @@ export class AppComponent implements OnInit {
   }
 
   canEditOrder(order: Order): boolean {
+    if (this.role() === 'distributor') {
+      return order.distributorId === this.selectedDistributorId() && ['pending', 'draft'].includes(order.status);
+    }
     return (this.role() === 'admin' || this.role() === 'manager') && ['pending', 'draft', 'confirmed'].includes(order.status);
   }
 
   canAddItem(order: Order): boolean {
+    if (this.role() === 'distributor') {
+      return order.distributorId === this.selectedDistributorId() && ['pending', 'draft'].includes(order.status);
+    }
     return (this.role() === 'admin' || this.role() === 'manager') && ['pending', 'draft'].includes(order.status);
+  }
+
+  canDistributorCancel(order: Order): boolean {
+    return this.role() === 'distributor' &&
+      order.distributorId === this.selectedDistributorId() &&
+      ['pending', 'draft'].includes(order.status);
+  }
+
+  async distributorCancelOrder(orderId: string): Promise<void> {
+    await this.updateOrderStatus(orderId, 'cancelled', 'Дистрибьютор тапсырысты жойды');
+  }
+
+  async permanentlyDeleteOrder(orderId: string): Promise<void> {
+    const order = this.orders().find(o => o.id === orderId);
+    if (!order?.uuid) return;
+    if (this.selectedOrderId() === orderId) {
+      this.selectedOrderId.set('');
+    }
+    const err = await this.orderService.hardDelete(order.uuid);
+    if (err) { console.error('permanentlyDeleteOrder:', err); return; }
+    await this.reloadAll();
   }
 
   async removeOrderItem(orderId: string, productId: number): Promise<void> {
     const order = this.orders().find(o => o.id === orderId);
     const item = order?.items.find(i => i.productId === productId);
     if (!item?.id) return;
-    await this.orderService.removeItem(item.id);
+    const err = await this.orderService.removeItem(item.id);
+    if (err) { console.error('removeOrderItem:', err); return; }
     await this.reloadAll();
   }
 
@@ -1136,11 +1166,13 @@ export class AppComponent implements OnInit {
     if (!order?.uuid) return;
     const product = this.products().find(p => p.id === Number(this.addItemProductId));
     if (!product) return;
+    // Close immediately so repeated clicks can't fire a second request
+    this.addItemModal.set(false);
+    this.addItemQuery.set('');
     const distributor = this.orderDistributor(order);
     const discount = this.effectiveDiscount(product, distributor);
     const unitPrice = Math.round(product.basePrice * (1 - discount));
     const qty = Math.max(1, Number(this.addItemQty) || 1);
-    // If the product is already on the order, bump its qty; otherwise add a new line.
     const existing = order.items.find(i => i.productId === product.id);
     if (existing?.id) {
       await this.orderService.updateItemQty(existing.id, existing.qty + qty);
@@ -1148,8 +1180,6 @@ export class AppComponent implements OnInit {
       await this.orderService.addItem(order.uuid, product.id, qty, unitPrice, discount);
     }
     await this.reloadAll();
-    this.addItemModal.set(false);
-    this.addItemQuery.set('');
   }
 
   openShipModal(): void {

@@ -83,6 +83,13 @@ export class OrderService {
     return null;
   }
 
+  async hardDelete(orderId: string): Promise<string | null> {
+    const { error } = await supabase.from('orders').delete().eq('id', orderId);
+    if (error) return error.message;
+    await this.load();
+    return null;
+  }
+
   private async addHistory(orderId: string, status: OrderStatus, note: string): Promise<void> {
     await supabase.from('order_history').insert({ order_id: orderId, status, note });
   }

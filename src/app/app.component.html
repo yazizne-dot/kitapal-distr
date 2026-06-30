@@ -14,7 +14,13 @@
     </label>
     <label>
       Пароль
-      <input type="password" [(ngModel)]="password" placeholder="••••••••" (keyup.enter)="login()">
+      <div class="password-input-wrap">
+        <input [type]="showLoginPassword() ? 'text' : 'password'" [(ngModel)]="password" placeholder="••••••••" (keyup.enter)="login()">
+        <button type="button" class="toggle-pwd-btn" (click)="showLoginPassword.set(!showLoginPassword())" tabindex="-1">
+          <svg *ngIf="!showLoginPassword()" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg *ngIf="showLoginPassword()" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
     </label>
 
     <label class="login-remember">
@@ -566,30 +572,31 @@
             <table class="price-list-table">
               <thead>
                 <tr>
-                  <th>Штрихкод</th>
                   <th>Кітап</th>
-                  <th>Баспасы</th>
-                  <th>Негізгі баға</th>
-                  <th>Менің бағам</th>
+                  <th>Бағам</th>
                   <th>Саны</th>
-                  <th>Қосынды</th>
                 </tr>
               </thead>
               <tbody>
                 <tr *ngFor="let product of displayedProducts()">
-                  <td><small>{{ product.barcode }}</small></td>
-                  <td><strong>{{ product.name }}</strong></td>
-                  <td>{{ product.publisher }}</td>
-                  <td>{{ product.basePrice | kzt }}</td>
-                  <td><strong class="my-price-cell">{{ myPrice(product) | kzt }}</strong></td>
                   <td>
+                    <strong class="book-title-list">{{ product.name }}</strong>
+                    <span class="book-meta-list">{{ product.publisher }} · {{ product.barcode }}</span>
+                  </td>
+                  <td class="price-cell-list">
+                    <strong class="my-price-cell">{{ myPrice(product) | kzt }}</strong>
+                    <small class="base-price-sub">{{ product.basePrice | kzt }}</small>
+                  </td>
+                  <td class="qty-cell-list">
                     <div class="qty-row-sm">
                       <button type="button" (click)="changePriceQty(product.id, -1)">−</button>
                       <input type="number" min="0" [ngModel]="priceQty(product.id)" (ngModelChange)="setPriceQty(product.id, $event)">
                       <button type="button" (click)="changePriceQty(product.id, 1)">+</button>
                     </div>
+                    <small class="qty-total-inline" *ngIf="priceQty(product.id) > 0">
+                      {{ myPrice(product) * priceQty(product.id) | kzt }}
+                    </small>
                   </td>
-                  <td><strong>{{ myPrice(product) * priceQty(product.id) | kzt }}</strong></td>
                 </tr>
               </tbody>
             </table>
@@ -782,6 +789,7 @@
                 <th>Статус</th>
                 <th>Сома</th>
                 <th>Күні</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -803,6 +811,14 @@
                 </td>
                 <td>{{ order.amount | kzt }}</td>
                 <td>{{ order.createdAt | date:'dd.MM' }}</td>
+                <td (click)="$event.stopPropagation()">
+                  <button
+                    *ngIf="order.status === 'cancelled' || order.status === 'draft'"
+                    type="button"
+                    class="order-delete-btn"
+                    title="Мүлдем жою"
+                    (click)="permanentlyDeleteOrder(order.id)">×</button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -937,6 +953,14 @@
             <button type="button" class="btn-ghost"
               *ngIf="role() === 'admin' && (selectedOrder()!.status === 'pending' || selectedOrder()!.status === 'draft')"
               (click)="cancelOrder(selectedOrder()!.id)">Бас тарту</button>
+          </div>
+
+          <!-- Дистрибьютор әрекеттері -->
+          <div class="order-actions" *ngIf="canDistributorCancel(selectedOrder()!)">
+            <button type="button" class="btn-ghost btn-danger-ghost"
+              (click)="distributorCancelOrder(selectedOrder()!.id)">
+              Тапсырысты жою
+            </button>
           </div>
 
           <!-- Бұрын жөнелтілген тапсырыстың накладнойын қайта шығару -->

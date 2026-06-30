@@ -11,7 +11,7 @@ export function loginToEmail(login: string): string {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   readonly profile = signal<Profile | null>(null);
-  readonly role = signal<Role>('admin');
+  readonly role = signal<Role>('distributor');
   readonly signedIn = signal(false);
 
   async login(login: string, password: string): Promise<string | null> {
