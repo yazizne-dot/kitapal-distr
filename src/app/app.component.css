@@ -3252,3 +3252,499 @@ nav button {
 .btn-del-payment:hover {
   background: #fff0f0;
 }
+
+/* Minimal Kitapal redesign overrides */
+:host {
+  --kitapal-primary: #B52278;
+  --kitapal-primary-dark: #8E1960;
+  --kitapal-primary-soft: #f8eaf2;
+  --surface-page: #fbfafc;
+  --surface-card: #ffffff;
+  --surface-muted: #f6f3f6;
+  --border-soft: #eadde6;
+  --text-strong: #25141f;
+  --text-body: #4b3d47;
+  --text-muted: #7b6c76;
+  --success: #197a4f;
+  --success-soft: #e8f5ef;
+  --warning: #9a6a12;
+  --warning-soft: #fff6df;
+  --danger: #b43a3a;
+  --danger-soft: #fae9e9;
+  --shadow-soft: 0 12px 36px rgba(73, 35, 58, 0.08);
+  color: var(--text-strong);
+}
+
+.login-page {
+  background:
+    linear-gradient(120deg, rgba(251, 250, 252, 0.96), rgba(248, 234, 242, 0.9)),
+    url('/assets/bookshelf-bg.jpg') center/cover no-repeat;
+  place-items: center;
+}
+
+.login-panel {
+  border: 1px solid rgba(181, 34, 120, 0.14);
+  box-shadow: var(--shadow-soft);
+  gap: 16px;
+  max-width: 420px;
+  padding: 32px;
+}
+
+.kp-logo-img {
+  width: 156px;
+}
+
+.kp-mission,
+.topbar-sub {
+  color: var(--kitapal-primary-dark);
+}
+
+.login-divider {
+  background: var(--border-soft);
+  height: 1px;
+  opacity: 1;
+}
+
+.app-shell {
+  background: var(--surface-page);
+  grid-template-columns: minmax(220px, 248px) minmax(0, 1fr);
+}
+
+.sidebar {
+  background: var(--surface-card);
+  border-right: 1px solid var(--border-soft);
+  color: var(--text-strong);
+  gap: 22px;
+  padding: 22px 16px;
+}
+
+.brand {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-soft);
+  padding: 4px 8px 18px;
+}
+
+.sidebar-logo-img {
+  width: 118px;
+}
+
+nav {
+  gap: 4px;
+}
+
+nav button,
+.logout {
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 40px;
+}
+
+nav button.active,
+nav button:hover {
+  background: var(--kitapal-primary-soft);
+  color: var(--kitapal-primary);
+}
+
+.logout {
+  background: var(--surface-muted);
+  color: var(--danger);
+  justify-content: center;
+}
+
+.workspace {
+  padding: 24px clamp(18px, 3vw, 34px);
+}
+
+.topbar,
+.section-head,
+.dist-detail-header,
+.order-detail-panel,
+.profile-drawer,
+.modal,
+.stats-grid article,
+.panel,
+.entry-card,
+.simple-screen,
+.partner-card,
+.price-summary-strip article,
+.price-order,
+.price-card,
+.debt-summary-strip article,
+.month-group,
+.dist-messages,
+.dist-progress-panel,
+.col-vis-bar,
+.notif-empty,
+table {
+  background: var(--surface-card);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.topbar {
+  margin-bottom: 22px;
+  padding: 18px 20px;
+}
+
+.topbar-brand h1 {
+  background: none;
+  color: var(--text-strong);
+  font-size: clamp(22px, 2.5vw, 30px);
+  letter-spacing: 0;
+  -webkit-text-fill-color: currentColor;
+}
+
+.profile-av,
+.profile-drawer-av {
+  background: var(--kitapal-primary);
+}
+
+.profile-btn {
+  border-color: var(--border-soft);
+  border-radius: 8px;
+}
+
+.profile-btn:hover,
+.profile-notif-row,
+.lang-btn,
+.fin-cards article,
+.form-strip,
+.notice,
+.login-hint {
+  background: var(--surface-muted);
+}
+
+.screen {
+  gap: 18px;
+}
+
+.stats-grid,
+.dashboard-grid,
+.cards-grid,
+.price-card-grid {
+  gap: 14px;
+}
+
+.stats-grid article,
+.panel,
+.partner-card,
+.price-card-body,
+.price-order,
+.entry-card {
+  padding: 18px;
+}
+
+.stats-grid span,
+.panel-title span,
+.partner-card span,
+.price-card p,
+.price-card small,
+.price-lines span,
+.draft-list span,
+.mini-row small,
+.muted,
+.result-count,
+.breadcrumb,
+.profile-btn-info small,
+.dist-detail-meta span,
+.notif-text,
+.notif-date,
+.pay-hist-count {
+  color: var(--text-muted);
+}
+
+.stats-grid strong,
+.price-summary-strip strong,
+.price-order h2,
+.fin-cards strong,
+.mstat strong,
+.pending-amount,
+.profile-btn-info strong,
+.profile-drawer-info strong,
+.lang-btn strong,
+.dist-detail-title h2,
+.panel-title h2,
+.panel h2,
+.section-head h2,
+.simple-screen h2,
+.partner-card h3,
+.price-card h3 {
+  color: var(--text-strong);
+}
+
+.stats-grid small,
+.topbar-sub,
+.order-detail-head small {
+  color: var(--kitapal-primary-dark);
+}
+
+.goal-list i,
+.card-progress-bar,
+.dist-progress-bar,
+.city-bars span {
+  background: var(--surface-muted);
+}
+
+.goal-list em,
+.card-progress-fill,
+.dist-progress-fill {
+  background: var(--kitapal-primary);
+}
+
+.login-actions button,
+.section-head button,
+.entry-card button,
+.category-tabs button.active,
+.qty-row button,
+.qty-row-sm button,
+.btn-confirm,
+.btn-new-order,
+.col-chip,
+.month-tab.active,
+.btn-view-all:hover,
+.view-toggle button.active,
+.profile-tabs button.active,
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--kitapal-primary) !important;
+  border-color: var(--kitapal-primary) !important;
+  color: #fff !important;
+}
+
+.login-actions .ghost,
+.category-tabs button,
+.sort-btns button,
+.btn-ghost,
+.btn-back,
+.add-item-btn,
+.load-more-btn,
+.view-toggle button,
+.col-chip-off,
+.col-chip-reset {
+  background: var(--surface-muted);
+  border-color: var(--border-soft);
+  color: var(--kitapal-primary);
+}
+
+input,
+select,
+.search input,
+.modal-search,
+.modal-qty-input,
+.qty-row input,
+.qty-row-sm input,
+.discount-edit-input,
+.qty-edit-input,
+.head-actions select,
+.pay-filter-select {
+  border-color: var(--border-soft);
+  border-radius: 8px;
+  color: var(--text-strong);
+}
+
+input:focus,
+select:focus,
+.search input:focus,
+.modal-search:focus,
+.modal-qty-input:focus {
+  border-color: var(--kitapal-primary);
+  box-shadow: 0 0 0 3px rgba(181, 34, 120, 0.12);
+  outline: none;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+th {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+td {
+  color: var(--text-body);
+}
+
+th,
+td,
+.mini-row,
+.draft-list article,
+.partner-total,
+.profile-drawer-header,
+.profile-tabs,
+.profile-drawer-footer,
+.month-group-header,
+.pending-header,
+.pending-item {
+  border-color: var(--border-soft);
+}
+
+.badge,
+.badge-delivered,
+.notice.success,
+.limit-warning,
+.dist-city-tag,
+.role-dist,
+.paid-cell,
+.final-amt,
+.qty-total-inline,
+.my-price-cell {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.badge.warn,
+.badge-pending,
+.notice.warn,
+.archive-notice,
+.month-stats-bar,
+.pay-filter-total {
+  background: var(--warning-soft);
+  border-color: #f0dca7;
+  color: var(--warning);
+}
+
+.badge.danger,
+.notice.danger,
+.login-error,
+.limit-warning.danger,
+.order-delete-btn,
+.rm-btn,
+.btn-del-sm,
+.btn-danger-ghost,
+.pwd-msg,
+.logout-drawer-btn {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.price-lines .my-price,
+.login-code,
+.order-num,
+.order-detail-num,
+.draft-list b,
+.top-list b,
+.btn-edit-sm,
+.notif-more-btn,
+.card-open-hint,
+.month-tab.has-data,
+.btn-view-all {
+  color: var(--kitapal-primary);
+}
+
+.book-cover {
+  background:
+    linear-gradient(180deg, rgba(37, 20, 31, 0.08), rgba(37, 20, 31, 0.58)),
+    url('https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=400&q=80') center/cover;
+}
+
+.book-cover span {
+  background: rgba(37, 20, 31, 0.72);
+}
+
+.clickable-card {
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.clickable-card:hover {
+  border-color: rgba(181, 34, 120, 0.36);
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
+}
+
+.pending-orders-panel {
+  border: 1px solid rgba(180, 58, 58, 0.28);
+  border-radius: 8px;
+}
+
+.pending-header {
+  background: var(--danger-soft);
+}
+
+.pending-dot,
+.menu-badge,
+.mtab-badge-pending {
+  background: var(--danger) !important;
+}
+
+.month-tab {
+  background: var(--surface-muted);
+  border-color: transparent;
+  border-radius: 999px;
+}
+
+.month-tab.has-data {
+  background: var(--kitapal-primary-soft);
+  border-color: rgba(181, 34, 120, 0.18);
+}
+
+.month-empty-state {
+  border-color: var(--border-soft);
+  color: var(--text-muted);
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-bottom: 1px solid var(--border-soft);
+    border-right: 0;
+    min-height: 62px;
+    padding: 8px 12px;
+  }
+
+  .brand {
+    border-bottom: 0;
+    border-right: 1px solid var(--border-soft);
+    padding: 0 12px 0 0;
+  }
+
+  .sidebar-logo-img {
+    width: 94px;
+  }
+
+  nav button {
+    min-height: 38px;
+  }
+
+  .workspace {
+    padding: 16px;
+  }
+
+  .topbar {
+    padding: 16px;
+  }
+
+  .profile-btn {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 520px) {
+  .login-panel {
+    padding: 24px;
+  }
+
+  .stats-grid article,
+  .panel,
+  .partner-card,
+  .price-order,
+  .entry-card,
+  .section-head,
+  .simple-screen {
+    padding: 16px;
+  }
+
+  .topbar h1,
+  .section-head h2 {
+    font-size: 22px;
+  }
+}

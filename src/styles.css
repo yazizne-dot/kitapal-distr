@@ -7,12 +7,14 @@ html {
 }
 
 body {
-  background: #fbfcf9;
-  font-family: Arial, Helvetica, sans-serif;
+  background: #fbfafc;
+  color: #25141f;
+  font-family: Inter, Arial, Helvetica, sans-serif;
   margin: 0;
 }
 
 button,
-input {
+input,
+select {
   font-family: inherit;
 }
