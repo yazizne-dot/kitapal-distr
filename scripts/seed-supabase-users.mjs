@@ -46,8 +46,9 @@ const accounts = [
   { login: 'baigelov',   password: 'kitapal2026', name: 'Байгелов — Тараз',              role: 'distributor', distributorId: 7 },
   { login: 'jasko',      password: 'kitapal2026', name: 'ЖасКО — Тараз',                role: 'distributor', distributorId: 8 },
   { login: 'shymkent',   password: 'kitapal2026', name: 'Олжабаев — Шымкент',           role: 'distributor', distributorId: 9 },
-  { login: 'almaty',     password: 'kitapal2026', name: 'Сабитова Нұртас — Алматы',     role: 'distributor', distributorId: 10 },
+  { login: 'sabitova',   password: 'kitapal2026', name: 'Сабитова Нұртас — Алматы',     role: 'distributor', distributorId: 10 },
   { login: 'rakhmanov',  password: 'kitapal2026', name: 'Рахманов — Барахолка',         role: 'distributor', distributorId: 11 },
+  { login: 'almaty',     password: 'kitapal2026', name: 'Almaty Demo — Алматы',          role: 'distributor', distributorId: 12 },
 ];
 
 async function findUserIdByEmail(email) {

@@ -32,8 +32,9 @@ const accounts = [
   ['baigelov',   'kitapal2026', 'Байгелов — Тараз',           'distributor', 'Байгелов'],
   ['jasko',      'kitapal2026', 'ЖасКО — Тараз',              'distributor', 'ЖасКО'],
   ['shymkent',   'kitapal2026', 'Олжабаев — Шымкент',         'distributor', 'Олжабаев'],
-  ['almaty',     'kitapal2026', 'Сабитова Нұртас — Алматы',   'distributor', 'Сабитова Нұртас'],
+  ['sabitova',   'kitapal2026', 'Сабитова Нұртас — Алматы',   'distributor', 'Сабитова Нұртас'],
   ['rakhmanov',  'kitapal2026', 'Рахманов — Барахолка',       'distributor', 'Рахманов'],
+  ['almaty',     'kitapal2026', 'Almaty Demo — Алматы',       'distributor', 'Almaty Demo'],
 ];
 
 const { data: dists, error: dErr } = await admin.from('distributors').select('id, company');
