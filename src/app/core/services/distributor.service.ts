@@ -59,7 +59,7 @@ export class DistributorService {
     const { error: targetError } = await supabase
       .from('targets').upsert({
         distributor_id: distributorId,
-        period: '2026-H1',
+        period: this.currentHalfYear(),
         amount: input.target,
       }, { onConflict: 'distributor_id,period' });
     if (targetError) return targetError.message;
@@ -90,6 +90,12 @@ export class DistributorService {
 
     await this.load();
     return distributorId;
+  }
+
+  private currentHalfYear(): string {
+    const now = new Date();
+    const half = now.getMonth() <= 5 ? 'H1' : 'H2';
+    return `${now.getFullYear()}-${half}`;
   }
 
   private async ensureOpeningBalanceProduct(): Promise<number | string> {

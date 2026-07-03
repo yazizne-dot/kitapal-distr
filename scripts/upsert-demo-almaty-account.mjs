@@ -27,6 +27,10 @@ const admin = createClient(url, key, {
 });
 
 const password = 'kitapal2026';
+const currentHalfYear = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${now.getMonth() <= 5 ? 'H1' : 'H2'}`;
+};
 
 async function ensureAuthProfile({ login, fullName, role, distributorId }) {
   const email = `${login}@kitapal.kz`;
@@ -93,7 +97,7 @@ if (demoDistributorId) {
 
 const { error: targetError } = await admin.from('targets').upsert({
   distributor_id: demoDistributorId,
-  period: '2026-H1',
+  period: currentHalfYear(),
   amount: 12000000,
 }, { onConflict: 'distributor_id,period' });
 if (targetError) throw targetError;
