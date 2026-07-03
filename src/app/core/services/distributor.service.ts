@@ -34,6 +34,15 @@ export class DistributorService {
   }
 
   async createWithOpeningBalance(input: CreateDistributorInput): Promise<number | string> {
+    const { data: existing, error: existingError } = await supabase
+      .from('distributors')
+      .select('id')
+      .eq('company', input.company)
+      .eq('city', input.city)
+      .maybeSingle();
+    if (existingError) return existingError.message;
+    if (existing?.id) return 'Дистрибьютор осындай компания және қала бойынша бұрыннан бар';
+
     const { data: distributor, error: distributorError } = await supabase
       .from('distributors').insert({
         company: input.company,

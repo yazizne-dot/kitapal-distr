@@ -493,7 +493,9 @@
         </label>
         <p *ngIf="distributorError" style="color:#c0392b;font-size:13px;margin:8px 0 0">{{ distributorError }}</p>
         <div class="modal-actions">
-          <button type="button" class="btn-confirm" (click)="saveDistributor()">Сақтау</button>
+          <button type="button" class="btn-confirm" [disabled]="distributorSaving()" (click)="saveDistributor()">
+            {{ distributorSaving() ? 'Сақталуда...' : 'Сақтау' }}
+          </button>
           <button type="button" class="btn-ghost" (click)="distributorModal.set(false)">Бас тарту</button>
         </div>
       </div>

@@ -405,6 +405,7 @@ export class AppComponent implements OnInit {
   newAccDistributorId = 1;
 
   distributorModal = signal(false);
+  distributorSaving = signal(false);
   distributorError = '';
   newDistCompany = '';
   newDistCity = '';
@@ -941,11 +942,12 @@ export class AppComponent implements OnInit {
     this.newDistOpeningDebtStr = '0';
     this.newDistPhone = '';
     this.distributorError = '';
+    this.distributorSaving.set(false);
     this.distributorModal.set(true);
   }
 
   async saveDistributor(): Promise<void> {
-    if (this.role() !== 'admin') return;
+    if (this.role() !== 'admin' || this.distributorSaving()) return;
     const company = this.newDistCompany.trim();
     const city = this.newDistCity.trim();
     const discountPct = Number(this.newDistDiscountStr);
@@ -966,25 +968,30 @@ export class AppComponent implements OnInit {
       return;
     }
 
-    const result = await this.distributorService.createWithOpeningBalance({
-      company,
-      city,
-      discount: discountPct / 100,
-      creditLimit,
-      target,
-      openingDebt,
-      phone: this.newDistPhone.trim(),
-    });
-    if (typeof result === 'string') {
-      this.distributorError = result;
-      return;
-    }
+    this.distributorSaving.set(true);
+    try {
+      const result = await this.distributorService.createWithOpeningBalance({
+        company,
+        city,
+        discount: discountPct / 100,
+        creditLimit,
+        target,
+        openingDebt,
+        phone: this.newDistPhone.trim(),
+      });
+      if (typeof result === 'string') {
+        this.distributorError = result;
+        return;
+      }
 
-    await this.reloadAll();
-    this.selectedDistributorId.set(result);
-    this.distributorDetailId.set(result);
-    this.detailActiveMonth.set('all');
-    this.distributorModal.set(false);
+      await this.reloadAll();
+      this.selectedDistributorId.set(result);
+      this.distributorDetailId.set(result);
+      this.detailActiveMonth.set('all');
+      this.distributorModal.set(false);
+    } finally {
+      this.distributorSaving.set(false);
+    }
   }
 
   openMessageModal(distId: number): void {

@@ -12,11 +12,17 @@ const checks = [
   ['service inserts distributor', files.service, ".from('distributors').insert"],
   ['service writes target', files.service, ".from('targets').upsert"],
   ['service creates opening debt order', files.service, "status: 'confirmed'"],
+  ['service checks existing distributor', files.service, '.eq(\'company\', input.company)'],
+  ['service returns duplicate message', files.service, 'Дистрибьютор осындай компания және қала бойынша бұрыннан бар'],
   ['component modal signal', files.component, 'distributorModal = signal(false)'],
+  ['component saving guard signal', files.component, 'distributorSaving = signal(false)'],
   ['component open modal', files.component, 'openDistributorModal(): void'],
   ['component save modal', files.component, 'async saveDistributor(): Promise<void>'],
+  ['component prevents double submit', files.component, 'if (this.role() !== \'admin\' || this.distributorSaving()) return;'],
+  ['component resets saving flag', files.component, 'this.distributorSaving.set(false);'],
   ['template admin button wired', files.template, '(click)="openDistributorModal()"'],
   ['template modal title', files.template, 'Жаңа дистрибьютор'],
+  ['template disables save button', files.template, '[disabled]="distributorSaving()"'],
   ['template save button wired', files.template, '(click)="saveDistributor()"'],
 ];
 
