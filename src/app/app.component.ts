@@ -6,7 +6,7 @@ import { type Product } from './price-products';
 import { KztPipe } from './kzt.pipe';
 import { AuthService, loginToEmail } from './core/services/auth.service';
 import { ProductService } from './core/services/product.service';
-import { DistributorService } from './core/services/distributor.service';
+import { DistributorService, periodLabel } from './core/services/distributor.service';
 import { OrderService, decideStatus } from './core/services/order.service';
 import { PaymentService } from './core/services/payment.service';
 import { MessageService } from './core/services/message.service';
@@ -362,6 +362,10 @@ export class AppComponent implements OnInit {
   // Discount editing (admin only)
   editingDiscountDistId = signal<number | null>(null);
   editDiscountStr = '';
+
+  // Target editing (admin only)
+  editingTargetDistId = signal<number | null>(null);
+  editTargetStr = '';
 
   // Payment recording
   paymentModalOpen = signal(false);
@@ -931,6 +935,30 @@ export class AppComponent implements OnInit {
     await this.distributorService.setDiscount(distId, pct / 100);
     await this.reloadAll();
     this.editingDiscountDistId.set(null);
+  }
+
+  startEditTarget(d: Distributor): void {
+    this.editingTargetDistId.set(d.id);
+    this.editTargetStr = String(d.target);
+  }
+
+  async saveTarget(distId: number): Promise<void> {
+    if (this.role() !== 'admin') return;
+    const amount = parseFloat(this.editTargetStr);
+    if (isNaN(amount) || amount < 0) return;
+    await this.distributorService.setTarget(distId, this.distributorService.currentPeriod(), amount);
+    await this.reloadAll();
+    this.editingTargetDistId.set(null);
+  }
+
+  async createNewPeriodTargets(): Promise<void> {
+    if (this.role() !== 'admin') return;
+    await this.distributorService.ensureCurrentPeriodTargets();
+    await this.reloadAll();
+  }
+
+  currentPeriodLabel(): string {
+    return periodLabel(this.distributorService.currentPeriod());
   }
 
   openDistributorModal(): void {

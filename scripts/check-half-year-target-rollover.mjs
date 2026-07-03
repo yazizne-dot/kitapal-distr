@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 
 const files = {
   service: readFileSync(new URL('../src/app/core/services/distributor.service.ts', import.meta.url), 'utf8'),
+  component: readFileSync(new URL('../src/app/app.component.ts', import.meta.url), 'utf8'),
 };
 
 const checks = [
@@ -12,6 +13,11 @@ const checks = [
   ['service sets a single target', files.service, 'async setTarget(distributorId: number, period: string, amount: number): Promise<string | null> {'],
   ['service backfills missing targets', files.service, 'async ensureCurrentPeriodTargets(): Promise<string | null> {'],
   ['service inserts backfilled targets', files.service, '.insert(missingIds.map((id) => ({ distributor_id: id, period, amount: 0 })));'],
+  ['component target editing signal', files.component, 'editingTargetDistId = signal<number | null>(null)'],
+  ['component start edit target', files.component, 'startEditTarget(d: Distributor): void {'],
+  ['component save target', files.component, 'async saveTarget(distId: number): Promise<void> {'],
+  ['component create new period targets', files.component, 'async createNewPeriodTargets(): Promise<void> {'],
+  ['component period label helper', files.component, 'currentPeriodLabel(): string {'],
 ];
 
 const missing = checks.filter(([, content, marker]) => !content.includes(marker));
