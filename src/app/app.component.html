@@ -214,7 +214,7 @@
             <h2>Дистрибьюторлар</h2>
             <small class="result-count">{{ visibleDistributors().length }} дистрибьютор</small>
           </div>
-          <button type="button" *ngIf="role() === 'admin'">Admin арқылы тіркеу</button>
+          <button type="button" *ngIf="role() === 'admin'" (click)="openDistributorModal()">+ Жаңа дистрибьютор</button>
         </div>
 
         <div class="cards-grid">
@@ -455,6 +455,49 @@
 
       </ng-container>
     </section>
+
+    <!-- Distributor modal -->
+    <div class="modal-overlay" *ngIf="distributorModal()">
+      <div class="modal acc-modal">
+        <div class="modal-head">
+          <h3>Жаңа дистрибьютор</h3>
+          <button type="button" class="modal-close" (click)="distributorModal.set(false)">✕</button>
+        </div>
+        <label class="modal-field-label">
+          Компания
+          <input class="modal-qty-input" [(ngModel)]="newDistCompany" placeholder="Almaty Demo">
+        </label>
+        <label class="modal-field-label">
+          Қала
+          <input class="modal-qty-input" [(ngModel)]="newDistCity" placeholder="Алматы">
+        </label>
+        <label class="modal-field-label">
+          Жеңілдік, %
+          <input type="number" min="0" max="100" step="1" class="modal-qty-input" [(ngModel)]="newDistDiscountStr" placeholder="40">
+        </label>
+        <label class="modal-field-label">
+          Кредит лимит
+          <input type="number" min="0" step="1000" class="modal-qty-input" [(ngModel)]="newDistCreditLimitStr" placeholder="4000000">
+        </label>
+        <label class="modal-field-label">
+          6 айлық мақсат
+          <input type="number" min="0" step="1000" class="modal-qty-input" [(ngModel)]="newDistTargetStr" placeholder="12000000">
+        </label>
+        <label class="modal-field-label">
+          Қазіргі қарыз
+          <input type="number" min="0" step="1000" class="modal-qty-input" [(ngModel)]="newDistOpeningDebtStr" placeholder="2300000">
+        </label>
+        <label class="modal-field-label">
+          Телефон
+          <input class="modal-qty-input" [(ngModel)]="newDistPhone" placeholder="+7">
+        </label>
+        <p *ngIf="distributorError" style="color:#c0392b;font-size:13px;margin:8px 0 0">{{ distributorError }}</p>
+        <div class="modal-actions">
+          <button type="button" class="btn-confirm" (click)="saveDistributor()">Сақтау</button>
+          <button type="button" class="btn-ghost" (click)="distributorModal.set(false)">Бас тарту</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ══ PRICE ══ -->
     <section class="screen" *ngIf="activeScreen() === 'price'">

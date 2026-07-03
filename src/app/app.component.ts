@@ -404,6 +404,16 @@ export class AppComponent implements OnInit {
   newAccRole: Role = 'distributor';
   newAccDistributorId = 1;
 
+  distributorModal = signal(false);
+  distributorError = '';
+  newDistCompany = '';
+  newDistCity = '';
+  newDistDiscountStr = '40';
+  newDistCreditLimitStr = '';
+  newDistTargetStr = '';
+  newDistOpeningDebtStr = '0';
+  newDistPhone = '';
+
   // Data now comes from Supabase via services (mapped to the camelCase shapes the template uses).
   distributors = signal<Distributor[]>([]);
   products = signal<Product[]>([]);
@@ -920,6 +930,61 @@ export class AppComponent implements OnInit {
     await this.distributorService.setDiscount(distId, pct / 100);
     await this.reloadAll();
     this.editingDiscountDistId.set(null);
+  }
+
+  openDistributorModal(): void {
+    this.newDistCompany = '';
+    this.newDistCity = '';
+    this.newDistDiscountStr = '40';
+    this.newDistCreditLimitStr = '';
+    this.newDistTargetStr = '';
+    this.newDistOpeningDebtStr = '0';
+    this.newDistPhone = '';
+    this.distributorError = '';
+    this.distributorModal.set(true);
+  }
+
+  async saveDistributor(): Promise<void> {
+    if (this.role() !== 'admin') return;
+    const company = this.newDistCompany.trim();
+    const city = this.newDistCity.trim();
+    const discountPct = Number(this.newDistDiscountStr);
+    const creditLimit = Number(this.newDistCreditLimitStr);
+    const target = Number(this.newDistTargetStr);
+    const openingDebt = Number(this.newDistOpeningDebtStr || 0);
+
+    if (!company || !city) {
+      this.distributorError = 'Компания және қала міндетті';
+      return;
+    }
+    if (!Number.isFinite(discountPct) || discountPct < 0 || discountPct > 100) {
+      this.distributorError = 'Жеңілдік 0 мен 100 арасында болуы керек';
+      return;
+    }
+    if (!Number.isFinite(creditLimit) || creditLimit < 0 || !Number.isFinite(target) || target < 0 || !Number.isFinite(openingDebt) || openingDebt < 0) {
+      this.distributorError = 'Сомалар 0 немесе одан жоғары болуы керек';
+      return;
+    }
+
+    const result = await this.distributorService.createWithOpeningBalance({
+      company,
+      city,
+      discount: discountPct / 100,
+      creditLimit,
+      target,
+      openingDebt,
+      phone: this.newDistPhone.trim(),
+    });
+    if (typeof result === 'string') {
+      this.distributorError = result;
+      return;
+    }
+
+    await this.reloadAll();
+    this.selectedDistributorId.set(result);
+    this.distributorDetailId.set(result);
+    this.detailActiveMonth.set('all');
+    this.distributorModal.set(false);
   }
 
   openMessageModal(distId: number): void {

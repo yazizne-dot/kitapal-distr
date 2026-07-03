@@ -1,0 +1,33 @@
+import { readFileSync } from 'node:fs';
+
+const files = {
+  service: readFileSync(new URL('../src/app/core/services/distributor.service.ts', import.meta.url), 'utf8'),
+  component: readFileSync(new URL('../src/app/app.component.ts', import.meta.url), 'utf8'),
+  template: readFileSync(new URL('../src/app/app.component.html', import.meta.url), 'utf8'),
+};
+
+const checks = [
+  ['service input type', files.service, 'export interface CreateDistributorInput'],
+  ['service create method', files.service, 'async createWithOpeningBalance(input: CreateDistributorInput): Promise<number | string>'],
+  ['service inserts distributor', files.service, ".from('distributors').insert"],
+  ['service writes target', files.service, ".from('targets').upsert"],
+  ['service creates opening debt order', files.service, "status: 'confirmed'"],
+  ['component modal signal', files.component, 'distributorModal = signal(false)'],
+  ['component open modal', files.component, 'openDistributorModal(): void'],
+  ['component save modal', files.component, 'async saveDistributor(): Promise<void>'],
+  ['template admin button wired', files.template, '(click)="openDistributorModal()"'],
+  ['template modal title', files.template, 'Жаңа дистрибьютор'],
+  ['template save button wired', files.template, '(click)="saveDistributor()"'],
+];
+
+const missing = checks.filter(([, content, marker]) => !content.includes(marker));
+
+if (missing.length > 0) {
+  console.error('Create distributor flow markers missing:');
+  for (const [label, , marker] of missing) {
+    console.error(`- ${label}: ${marker}`);
+  }
+  process.exit(1);
+}
+
+console.log(`Create distributor flow markers present (${checks.length}/${checks.length})`);
