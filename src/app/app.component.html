@@ -85,7 +85,7 @@
         <article>
           <span>6 айлық мақсат</span>
           <strong>{{ totalTarget() | kzt }}</strong>
-          <small>Қаңтар / Шілде кезеңі</small>
+          <small>{{ currentPeriodLabel() }}</small>
         </article>
         <article>
           <span>Орындалған сома</span>
@@ -167,7 +167,7 @@
         <div>
           <h2>Мақсат және жеңілдік жүйесі</h2>
         </div>
-        <button type="button">Жаңа 6 айлық кезең</button>
+        <button type="button" *ngIf="role() === 'admin'" (click)="createNewPeriodTargets()">Жаңа 6 айлық кезең</button>
       </div>
 
       <table>
@@ -185,7 +185,17 @@
           <tr *ngFor="let item of distributors()">
             <td>{{ item.city }}</td>
             <td>{{ item.company }}</td>
-            <td>{{ item.target | kzt }}</td>
+            <td>
+              <ng-container *ngIf="role() === 'admin' && editingTargetDistId() === item.id; else targetView">
+                <input type="number" class="discount-edit-input" [(ngModel)]="editTargetStr" min="0" step="1000">
+                <button type="button" class="btn-discount-save" title="Сақтау" (click)="saveTarget(item.id)">✓</button>
+                <button type="button" class="btn-discount-cancel" title="Бас тарту" (click)="editingTargetDistId.set(null)">✕</button>
+              </ng-container>
+              <ng-template #targetView>
+                {{ item.target | kzt }}
+                <button type="button" class="btn-discount-edit" *ngIf="role() === 'admin'" title="Мақсатты өзгерту" (click)="startEditTarget(item)">✎</button>
+              </ng-template>
+            </td>
             <td>{{ item.achieved | kzt }}</td>
             <td>
               <ng-container *ngIf="role() === 'admin' && editingDiscountDistId() === item.id; else discountView">
