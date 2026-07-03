@@ -12,6 +12,20 @@ export interface CreateDistributorInput {
   phone: string;
 }
 
+export function halfYearPeriod(date: Date): string {
+  const half = date.getMonth() <= 5 ? 'H1' : 'H2';
+  return `${date.getFullYear()}-${half}`;
+}
+
+export function periodLabel(period: string): string {
+  return period.endsWith('H1') ? 'Қаңтар – Маусым' : 'Шілде – Желтоқсан';
+}
+
+export function missingTargetDistributorIds(distributorIds: number[], coveredIds: number[]): number[] {
+  const covered = new Set(coveredIds);
+  return distributorIds.filter((id) => !covered.has(id));
+}
+
 @Injectable({ providedIn: 'root' })
 export class DistributorService {
   readonly distributors = signal<Distributor[]>([]);
@@ -29,6 +43,37 @@ export class DistributorService {
   async setDiscount(id: number, discount: number): Promise<string | null> {
     const { error } = await supabase.from('distributors').update({ discount }).eq('id', id);
     if (error) return error.message;
+    await this.load();
+    return null;
+  }
+
+  async setTarget(distributorId: number, period: string, amount: number): Promise<string | null> {
+    const { error } = await supabase
+      .from('targets')
+      .upsert({ distributor_id: distributorId, period, amount }, { onConflict: 'distributor_id,period' });
+    if (error) return error.message;
+    await this.load();
+    return null;
+  }
+
+  async ensureCurrentPeriodTargets(): Promise<string | null> {
+    const period = this.currentPeriod();
+    const { data: existing, error: existingError } = await supabase
+      .from('targets')
+      .select('distributor_id')
+      .eq('period', period);
+    if (existingError) return existingError.message;
+
+    const coveredIds = (existing ?? []).map((row) => row.distributor_id as number);
+    const allIds = this.distributors().map((d) => d.id);
+    const missingIds = missingTargetDistributorIds(allIds, coveredIds);
+    if (missingIds.length === 0) return null;
+
+    const { error: insertError } = await supabase
+      .from('targets')
+      .insert(missingIds.map((id) => ({ distributor_id: id, period, amount: 0 })));
+    if (insertError) return insertError.message;
+
     await this.load();
     return null;
   }
@@ -59,7 +104,7 @@ export class DistributorService {
     const { error: targetError } = await supabase
       .from('targets').upsert({
         distributor_id: distributorId,
-        period: this.currentHalfYear(),
+        period: this.currentPeriod(),
         amount: input.target,
       }, { onConflict: 'distributor_id,period' });
     if (targetError) return targetError.message;
@@ -92,10 +137,8 @@ export class DistributorService {
     return distributorId;
   }
 
-  private currentHalfYear(): string {
-    const now = new Date();
-    const half = now.getMonth() <= 5 ? 'H1' : 'H2';
-    return `${now.getFullYear()}-${half}`;
+  currentPeriod(): string {
+    return halfYearPeriod(new Date());
   }
 
   private async ensureOpeningBalanceProduct(): Promise<number | string> {
