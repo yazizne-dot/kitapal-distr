@@ -512,9 +512,7 @@ export class AppComponent implements OnInit {
     ['orders', 'Тапсырыстар'],
     ['debts', 'Қарыз және лимит'],
     ['users', 'Пайдаланушылар'],
-    ['notifications', 'Хабарламалар'],
-    ['excel', 'Excel импорт'],
-    ['security', 'RLS қауіпсіздік']
+    ['notifications', 'Хабарламалар']
   ];
 
   distributorMenu = [
