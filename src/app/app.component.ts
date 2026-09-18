@@ -419,6 +419,13 @@ export class AppComponent implements OnInit {
   newDistOpeningDebtStr = '0';
   newDistPhone = '';
 
+  financialModal = signal(false);
+  financialSaving = signal(false);
+  financialError = '';
+  editingFinancialDistributor: Distributor | null = null;
+  editCreditLimitStr = '';
+  editDebtStr = '';
+
   // Data now comes from Supabase via services (mapped to the camelCase shapes the template uses).
   distributors = signal<Distributor[]>([]);
   products = signal<Product[]>([]);
@@ -970,6 +977,43 @@ export class AppComponent implements OnInit {
     this.distributorError = '';
     this.distributorSaving.set(false);
     this.distributorModal.set(true);
+  }
+
+  openFinancialModal(distributor: Distributor): void {
+    if (this.role() !== 'admin') return;
+    this.editingFinancialDistributor = distributor;
+    this.editCreditLimitStr = String(distributor.creditLimit);
+    this.editDebtStr = String(distributor.debt);
+    this.financialError = '';
+    this.financialSaving.set(false);
+    this.financialModal.set(true);
+  }
+
+  async saveFinancials(): Promise<void> {
+    const distributor = this.editingFinancialDistributor;
+    if (this.role() !== 'admin' || !distributor || this.financialSaving()) return;
+
+    const creditLimit = Number(this.editCreditLimitStr);
+    const debt = Number(this.editDebtStr);
+    if (!Number.isFinite(creditLimit) || creditLimit < 0 || !Number.isFinite(debt) || debt < 0) {
+      this.financialError = 'Лимит пен қарыз 0 немесе одан жоғары болуы керек';
+      return;
+    }
+
+    this.financialSaving.set(true);
+    this.financialError = '';
+    try {
+      const error = await this.distributorService.updateFinancials(distributor.id, creditLimit, debt, distributor.debt);
+      if (error) {
+        this.financialError = error;
+        return;
+      }
+      await this.reloadAll();
+      this.financialModal.set(false);
+      this.editingFinancialDistributor = null;
+    } finally {
+      this.financialSaving.set(false);
+    }
   }
 
   async saveDistributor(): Promise<void> {

@@ -511,6 +511,35 @@
       </div>
     </div>
 
+    <!-- Қарыз және лимитті түзету -->
+    <div class="modal-overlay" *ngIf="financialModal()">
+      <div class="modal acc-modal" role="dialog" aria-modal="true" aria-labelledby="financial-modal-title">
+        <div class="modal-head">
+          <div>
+            <h3 id="financial-modal-title">Лимит пен қарызды өзгерту</h3>
+            <small>{{ editingFinancialDistributor?.company }} · {{ editingFinancialDistributor?.city }}</small>
+          </div>
+          <button type="button" class="modal-close" (click)="financialModal.set(false)">✕</button>
+        </div>
+        <label class="modal-field-label">
+          Кредит лимиті
+          <input type="number" min="0" step="1000" class="modal-qty-input" [(ngModel)]="editCreditLimitStr">
+        </label>
+        <label class="modal-field-label">
+          Жалпы қарыз
+          <input type="number" min="0" step="1000" class="modal-qty-input" [(ngModel)]="editDebtStr">
+        </label>
+        <p class="financial-modal-note">Қарыз өзгерісі төлем немесе түзету жазбасы ретінде тарихта сақталады.</p>
+        <p *ngIf="financialError" class="financial-modal-error">{{ financialError }}</p>
+        <div class="modal-actions">
+          <button type="button" class="btn-confirm" [disabled]="financialSaving()" (click)="saveFinancials()">
+            {{ financialSaving() ? 'Сақталуда...' : 'Сақтау' }}
+          </button>
+          <button type="button" class="btn-ghost" (click)="financialModal.set(false)">Бас тарту</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ══ PRICE ══ -->
     <section class="screen" *ngIf="activeScreen() === 'price'">
       <div class="section-head">
@@ -1156,7 +1185,12 @@
                 {{ item.debt | kzt }}
               </strong>
             </td>
-            <td>{{ item.creditLimit | kzt }}</td>
+            <td class="limit-cell">
+              <strong>{{ item.creditLimit | kzt }}</strong>
+              <button type="button" class="btn-financial" *ngIf="role() === 'admin'" (click)="openFinancialModal(item)">
+                Лимит/қарыз
+              </button>
+            </td>
             <td>
               <span class="badge" [class.danger]="item.debt > item.creditLimit" [class.warn]="item.debt > item.creditLimit * 0.8 && item.debt <= item.creditLimit">
                 {{ item.debt > item.creditLimit ? 'Лимит асты' : item.debt > item.creditLimit * 0.8 ? 'Ескерту' : 'Қалыпты' }}

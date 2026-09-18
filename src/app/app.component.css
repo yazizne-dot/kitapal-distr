@@ -2609,6 +2609,46 @@ td {
 
 .btn-pay:hover { background: #d4f0e2; }
 
+.btn-financial {
+  background: #fdf0f8;
+  border: 1px solid #b21d76;
+  border-radius: 6px;
+  color: #9b1767;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 6px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.btn-financial:hover { background: #f8dce9; }
+
+.limit-cell {
+  min-width: 128px;
+}
+
+.limit-cell strong,
+.limit-cell .btn-financial {
+  display: block;
+}
+
+.financial-modal-note {
+  background: #f7f4f6;
+  border-radius: 8px;
+  color: #5c5360;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.financial-modal-error {
+  color: #c0392b;
+  font-size: 13px;
+  margin: 0;
+}
+
 .payment-history {
   margin-top: 28px;
 }

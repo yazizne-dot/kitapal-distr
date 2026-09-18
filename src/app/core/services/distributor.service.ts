@@ -47,6 +47,57 @@ export class DistributorService {
     return null;
   }
 
+  /**
+   * Updates the visible credit limit and brings the calculated debt to the
+   * requested amount. A debt correction is deliberately recorded as an order
+   * or payment, rather than overwriting a calculated value.
+   */
+  async updateFinancials(id: number, creditLimit: number, currentDebt: number, previousDebt: number): Promise<string | null> {
+    const { error: limitError } = await supabase
+      .from('distributors')
+      .update({ credit_limit: creditLimit })
+      .eq('id', id);
+    if (limitError) return limitError.message;
+
+    const difference = Math.round((currentDebt - previousDebt) * 100) / 100;
+    if (difference === 0) {
+      await this.load();
+      return null;
+    }
+
+    if (difference < 0) {
+      const { error } = await supabase.from('payments').insert({
+        distributor_id: id,
+        amount: Math.abs(difference),
+        paid_at: new Date().toISOString().slice(0, 10),
+        note: 'Қарыз сомасын қолмен түзету',
+      });
+      if (error) return error.message;
+    } else {
+      const productId = await this.ensureOpeningBalanceProduct();
+      if (typeof productId === 'string') return productId;
+
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({ distributor_id: id, status: 'confirmed' })
+        .select('id')
+        .single();
+      if (orderError || !order) return orderError?.message ?? 'debt correction order insert failed';
+
+      const { error: itemError } = await supabase.from('order_items').insert({
+        order_id: order.id,
+        product_id: productId,
+        qty: 1,
+        unit_price: difference,
+        discount: 0,
+      });
+      if (itemError) return itemError.message;
+    }
+
+    await this.load();
+    return null;
+  }
+
   async setTarget(distributorId: number, period: string, amount: number): Promise<string | null> {
     const { error } = await supabase
       .from('targets')
