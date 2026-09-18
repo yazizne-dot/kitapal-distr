@@ -203,6 +203,10 @@ nav {
   gap: 6px;
 }
 
+.mobile-menu-toggle {
+  display: none;
+}
+
 nav button,
 .logout {
   align-items: center;
@@ -3805,6 +3809,7 @@ td,
     height: auto;
     min-height: 58px;
     padding: 7px 10px;
+    position: sticky;
   }
 
   .brand {
@@ -3819,6 +3824,56 @@ td,
   nav {
     min-width: 0;
     gap: 4px;
+  }
+
+  .mobile-menu-toggle {
+    align-items: center;
+    background: var(--kitapal-primary-soft);
+    border: 0;
+    border-radius: 8px;
+    display: grid;
+    flex: 0 0 40px;
+    gap: 4px;
+    height: 38px;
+    justify-content: center;
+    padding: 0;
+    width: 40px;
+  }
+
+  .mobile-menu-toggle span {
+    background: var(--kitapal-primary);
+    border-radius: 2px;
+    display: block;
+    height: 2px;
+    width: 18px;
+  }
+
+  .sidebar > nav {
+    display: none;
+  }
+
+  .sidebar.menu-open > nav {
+    background: var(--surface-card);
+    border-bottom: 1px solid var(--border-soft);
+    box-shadow: 0 12px 24px rgba(73, 35, 58, 0.12);
+    display: grid;
+    gap: 6px;
+    left: 0;
+    max-height: calc(100dvh - 58px);
+    overflow-y: auto;
+    padding: 12px;
+    position: absolute;
+    right: 0;
+    top: 100%;
+  }
+
+  .sidebar.menu-open > nav button {
+    color: var(--text-body);
+    font-size: 14px;
+    justify-content: flex-start;
+    min-height: 44px;
+    padding: 0 12px;
+    width: 100%;
   }
 
   nav button {

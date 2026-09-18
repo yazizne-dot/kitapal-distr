@@ -343,6 +343,7 @@ export class AppComponent implements OnInit {
   addItemQuery = signal('');
   shipModal = signal(false);
   showLoginPassword = signal(false);
+  mobileMenuOpen = signal(false);
 
   // Profile panel
   profileOpen = signal(false);

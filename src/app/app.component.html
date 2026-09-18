@@ -38,17 +38,24 @@
 </main>
 
 <main class="app-shell" *ngIf="signedIn()">
-  <aside class="sidebar">
+  <aside class="sidebar" [class.menu-open]="mobileMenuOpen()">
     <div class="brand">
       <img src="assets/kitapal-logo.png" alt="Kitapal" class="sidebar-logo-img">
     </div>
+
+    <button type="button" class="mobile-menu-toggle"
+      [attr.aria-expanded]="mobileMenuOpen()"
+      aria-label="Мәзірді ашу немесе жабу"
+      (click)="mobileMenuOpen.set(!mobileMenuOpen())">
+      <span></span><span></span><span></span>
+    </button>
 
     <nav>
       <button
         type="button"
         *ngFor="let item of currentMenu()"
         [class.active]="activeScreen() === item[0]"
-        (click)="navigate(item[0])"
+        (click)="navigate(item[0]); mobileMenuOpen.set(false)"
       >
         {{ item[1] }}
         <span class="menu-badge"
