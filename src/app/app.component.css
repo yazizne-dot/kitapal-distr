@@ -3817,6 +3817,7 @@ td,
   }
 
   nav {
+    min-width: 0;
     gap: 4px;
   }
 
@@ -3827,11 +3828,13 @@ td,
   }
 
   .logout {
+    flex: 0 0 38px;
     font-size: 0;
     margin-left: 0;
     min-height: 36px;
     min-width: 38px;
     padding: 0;
+    width: 38px;
   }
 
   .logout::before {
