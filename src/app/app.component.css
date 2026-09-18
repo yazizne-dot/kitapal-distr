@@ -3788,3 +3788,149 @@ td,
     font-size: 22px;
   }
 }
+
+/* ── Phone layout ── */
+@media (max-width: 600px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  .app-shell {
+    min-width: 0;
+  }
+
+  .sidebar {
+    gap: 8px;
+    min-height: 58px;
+    padding: 7px 10px;
+  }
+
+  .brand {
+    margin-right: 0;
+    padding-right: 9px;
+  }
+
+  .sidebar-logo-img {
+    width: 76px;
+  }
+
+  nav {
+    gap: 4px;
+  }
+
+  nav button {
+    font-size: 12px;
+    min-height: 36px;
+    padding: 0 9px;
+  }
+
+  .logout {
+    font-size: 0;
+    margin-left: 0;
+    min-height: 36px;
+    min-width: 38px;
+    padding: 0;
+  }
+
+  .logout::before {
+    content: '↪';
+    font-size: 20px;
+  }
+
+  .workspace {
+    gap: 16px;
+    padding: 12px;
+  }
+
+  .topbar {
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 14px;
+  }
+
+  .topbar-brand h1 {
+    font-size: 21px;
+  }
+
+  .profile-trigger {
+    align-self: stretch;
+    justify-content: space-between;
+  }
+
+  .profile-btn {
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  .screen {
+    gap: 16px;
+  }
+
+  .stats-grid,
+  .cards-grid,
+  .price-summary-strip,
+  .fin-cards,
+  .debt-summary-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid article {
+    gap: 6px;
+    padding: 16px;
+  }
+
+  .stats-grid strong {
+    font-size: 28px;
+  }
+
+  .section-head {
+    padding: 16px;
+  }
+
+  .section-head button,
+  .head-actions button {
+    width: 100%;
+  }
+
+  .month-tabs,
+  .month-tabs-section {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .month-tabs::-webkit-scrollbar,
+  .month-tabs-section::-webkit-scrollbar {
+    display: none;
+  }
+
+  table {
+    -webkit-overflow-scrolling: touch;
+    font-size: 13px;
+  }
+
+  th,
+  td {
+    padding: 11px 10px;
+  }
+
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    max-height: min(88dvh, 720px);
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions button {
+    width: 100%;
+  }
+}
