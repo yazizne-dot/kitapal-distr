@@ -3808,8 +3808,10 @@ td,
     gap: 8px;
     height: auto;
     min-height: 58px;
+    overflow: visible;
     padding: 7px 10px;
     position: sticky;
+    z-index: 200;
   }
 
   .brand {
@@ -3837,7 +3839,10 @@ td,
     height: 38px;
     justify-content: center;
     padding: 0;
+    position: relative;
+    touch-action: manipulation;
     width: 40px;
+    z-index: 202;
   }
 
   .mobile-menu-toggle span {
@@ -3865,6 +3870,7 @@ td,
     position: absolute;
     right: 0;
     top: 100%;
+    z-index: 201;
   }
 
   .sidebar.menu-open > nav button {
@@ -3874,6 +3880,10 @@ td,
     min-height: 44px;
     padding: 0 12px;
     width: 100%;
+  }
+
+  .sidebar.menu-open > nav button:active {
+    background: var(--kitapal-primary-soft);
   }
 
   nav button {
