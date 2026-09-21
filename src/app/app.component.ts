@@ -3,6 +3,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 // xlsx import removed — накладная is now generated as HTML (Form З-2)
 import { type Product } from './price-products';
+import { undiscountedPrice } from './core/utils/order-pricing';
 import { KztPipe } from './kzt.pipe';
 import { AuthService, loginToEmail } from './core/services/auth.service';
 import { ProductService } from './core/services/product.service';
@@ -1307,9 +1308,14 @@ export class AppComponent implements OnInit {
     return labels[status];
   }
 
+  orderBaseUnitPrice(item: Order['items'][number]): number {
+    return undiscountedPrice(item.unitPrice, item.discount,
+      this.products().find(p => p.id === item.productId)?.basePrice ?? 0);
+  }
+
   orderBaseTotal(order: Order): number {
     return order.items.reduce((sum, item) =>
-      sum + Math.round(item.unitPrice / (1 - item.discount)) * item.qty, 0);
+      sum + this.orderBaseUnitPrice(item) * item.qty, 0);
   }
 
   orderDiscountAmount(order: Order): number {
@@ -1468,7 +1474,7 @@ export class AppComponent implements OnInit {
 
     // ── Item rows ──
     const itemRows = order.items.map((item, idx) => {
-      const unitPrice = item.unitPrice * (1 - item.discount);
+      const unitPrice = item.unitPrice;
       return `<tr>
         <td class="c">${idx+1}</td>
         <td class="l">${item.name}</td>
@@ -1488,8 +1494,8 @@ export class AppComponent implements OnInit {
       name: item.name,
       barcode: item.barcode,
       qty: item.qty,
-      unitPrice: Math.round(item.unitPrice * (1 - item.discount)),
-      basePrice: Math.round(item.unitPrice),
+      unitPrice: item.unitPrice,
+      basePrice: this.orderBaseUnitPrice(item),
       discountPct: Math.round(item.discount * 100),
       amount: item.amount
     }));

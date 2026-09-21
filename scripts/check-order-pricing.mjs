@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+const source = readFileSync(new URL('../src/app/core/utils/order-pricing.ts', import.meta.url), 'utf8');
+const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
+const { lineAmount, undiscountedPrice } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
+assert.equal(lineAmount(10, 4895), 48950);
+assert.equal(undiscountedPrice(4895, .45) * 10, 89000);
+assert.equal(undiscountedPrice(4895, .45) * 10 - lineAmount(10, 4895), 40050);
+assert.equal(lineAmount(3, 12.34), 37.02);
+assert.equal(undiscountedPrice(100, 0), 100);
+assert.equal(undiscountedPrice(0, 1, 8900), 8900);
+assert.equal(lineAmount(10, 0), 0);
+assert.equal(lineAmount('10', '4895'), 48950);
+console.log('Order pricing: 8 assertions passed');

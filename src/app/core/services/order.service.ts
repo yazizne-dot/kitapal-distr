@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { supabase } from '../supabase.client';
 import { Order, OrderItem } from '../models/order';
+import { lineAmount } from '../utils/order-pricing';
 import { OrderStatus } from '../models/role';
 
 export function decideStatus(debt: number, amount: number, creditLimit: number): OrderStatus {
@@ -23,13 +24,13 @@ export class OrderService {
       id: o.id, order_code: o.order_code, distributor_id: o.distributor_id,
       status: o.status, created_at: o.created_at,
       items: (o.order_items ?? []).map((i: any) => ({
-        id: i.id, product_id: i.product_id, qty: i.qty, unit_price: i.unit_price,
-        discount: i.discount, amount: i.amount,
+        id: i.id, product_id: i.product_id, qty: Number(i.qty), unit_price: Number(i.unit_price),
+        discount: Number(i.discount), amount: lineAmount(i.qty, i.unit_price),
         name: i.products?.name, barcode: i.products?.barcode, publisher: i.products?.publisher,
       })) as OrderItem[],
       history: (o.order_history ?? []).map((h: any) => ({
         status: h.status, note: h.note, changed_at: h.changed_at })),
-      amount: (o.order_items ?? []).reduce((s: number, i: any) => s + Number(i.amount), 0),
+      amount: (o.order_items ?? []).reduce((s: number, i: any) => s + lineAmount(i.qty, i.unit_price), 0),
     })) as Order[]);
   }
 
