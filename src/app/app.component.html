@@ -327,12 +327,12 @@
           <article>
             <span>6 айлық мақсат</span>
             <strong>{{ selectedDetailDistributor()!.target | kzt }}</strong>
-            <small>{{ progress(selectedDetailDistributor()!) | percent }} орындалды</small>
+            <small>{{ paymentProgress(selectedDetailDistributor()!) | percent }} орындалды</small>
           </article>
           <article>
             <span>Реализация</span>
-            <strong>{{ selectedDetailDistributor()!.achieved | kzt }}</strong>
-            <small>2026 жыл</small>
+            <strong>{{ (paymentsByDist().get(selectedDetailDistributor()!.id) ?? 0) | kzt }}</strong>
+            <small>Тіркелген төлемдер</small>
           </article>
           <article>
             <span>Нақты қарыз</span>
@@ -353,9 +353,9 @@
         <!-- Прогресс -->
         <div class="dist-progress-panel">
           <div class="dist-progress-bar">
-            <div class="dist-progress-fill" [style.width.%]="progress(selectedDetailDistributor()!) * 100"></div>
+            <div class="dist-progress-fill" [style.width.%]="paymentProgress(selectedDetailDistributor()!) * 100"></div>
           </div>
-          <span>{{ progress(selectedDetailDistributor()!) | percent }} · мақсат {{ selectedDetailDistributor()!.target | kzt }}</span>
+          <span>{{ paymentProgress(selectedDetailDistributor()!) | percent }} · мақсат {{ selectedDetailDistributor()!.target | kzt }}</span>
         </div>
 
         <!-- ══ АЙ БОЙЫНША ВКЛАДКАЛАР ══ -->
