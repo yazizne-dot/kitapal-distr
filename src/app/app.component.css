@@ -1155,12 +1155,23 @@ td {
   padding: 0 12px;
 }
 
-/* ── Orders split ── */
+/* Keep the list and detail stacked so neither can cover the other. */
 .orders-split {
   align-items: start;
   display: grid;
   gap: 18px;
-  grid-template-columns: 400px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.orders-list-panel {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.orders-list-panel table {
+  min-width: 620px;
 }
 
 .orders-list-panel tbody tr {
@@ -1176,6 +1187,7 @@ td {
 }
 
 .order-num {
+  white-space: nowrap;
   color: #B52278;
   font-weight: 900;
 }
@@ -1213,6 +1225,8 @@ td {
   border-radius: 8px;
   display: grid;
   gap: 22px;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   padding: 22px;
 }
 
@@ -1279,6 +1293,32 @@ td {
 .detail-table-wrap {
   display: grid;
   gap: 10px;
+  min-width: 0;
+}
+
+.order-items-scroll {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.orders-list-panel table,
+.order-items-scroll table {
+  display: table;
+}
+
+.order-detail-head,
+.detail-table-head,
+.sort-btns {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.order-detail-num {
+  overflow-wrap: anywhere;
+}
+
+.detail-table-wrap table {
+  min-width: 760px;
 }
 
 .detail-table-head {
@@ -2296,6 +2336,61 @@ td {
   color: #19221f;
 }
 
+.btn-danger-inline {
+  background: #fff5f5;
+  border-color: #e27d7d;
+  color: #b73737;
+}
+
+.btn-danger-inline:hover {
+  background: #ffe9e9;
+  border-color: #c94949;
+}
+
+.btn-danger-inline:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.card-delete-btn {
+  background: #fff5f5;
+  border: 1px solid #e27d7d;
+  border-radius: 8px;
+  color: #b73737;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  margin-top: 14px;
+  min-height: 36px;
+  padding: 8px 12px;
+  width: 100%;
+}
+
+.card-delete-btn:hover {
+  background: #ffe9e9;
+  border-color: #c94949;
+}
+
+.card-delete-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.dist-delete-error {
+  color: #b73737;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+  margin: 2px 0 0;
+  max-width: 260px;
+}
+
+.card-delete-error {
+  margin-top: 8px;
+  max-width: none;
+  text-align: left;
+}
+
 .dist-progress-panel {
   align-items: center;
   background: #fff;
@@ -2560,12 +2655,21 @@ td {
     grid-column: auto;
   }
 
-  .orders-split {
+  .fin-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .fin-cards {
     grid-template-columns: 1fr;
   }
 
-  .fin-cards {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .order-detail-head,
+  .detail-table-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
   }
 }
 

@@ -99,6 +99,27 @@ export class DistributorService {
     return null;
   }
 
+  async deleteIfEmpty(id: number): Promise<string | null> {
+    const relatedChecks = await Promise.all([
+      this.hasRelatedRows('orders', id),
+      this.hasRelatedRows('payments', id),
+      this.hasRelatedRows('messages', id),
+      this.hasRelatedRows('profiles', id),
+    ]);
+
+    const failedCheck = relatedChecks.find((result) => typeof result === 'string');
+    if (typeof failedCheck === 'string') return failedCheck;
+
+    if (relatedChecks.some(Boolean)) {
+      return 'Связанные записи бар, удалить нельзя';
+    }
+
+    const { error } = await supabase.from('distributors').delete().eq('id', id);
+    if (error) return this.isRelationError(error.message) ? 'Связанные записи бар, удалить нельзя' : error.message;
+    await this.load();
+    return null;
+  }
+
   async createWithOpeningBalance(input: CreateDistributorInput): Promise<number | string> {
     const { data: existing, error: existingError } = await supabase
       .from('distributors')
@@ -160,6 +181,22 @@ export class DistributorService {
 
   currentPeriod(): string {
     return halfYearPeriod(new Date());
+  }
+
+  private async hasRelatedRows(
+    table: 'orders' | 'payments' | 'messages' | 'profiles',
+    distributorId: number,
+  ): Promise<boolean | string> {
+    const { count, error } = await supabase
+      .from(table)
+      .select('id', { count: 'exact', head: true })
+      .eq('distributor_id', distributorId);
+    if (error) return error.message;
+    return (count ?? 0) > 0;
+  }
+
+  private isRelationError(message: string): boolean {
+    return message.includes('foreign key') || message.includes('violates') || message.includes('referenced');
   }
 
   private async ensureOpeningBalanceProduct(): Promise<number | string> {

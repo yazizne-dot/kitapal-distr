@@ -96,8 +96,9 @@
         </article>
         <article>
           <span>Орындалған сома</span>
-          <strong>{{ totalAchieved() | kzt }}</strong>
-          <small>{{ totalAchieved() / totalTarget() | percent }}</small>
+          <strong>{{ totalPaid() | kzt }}</strong>
+          <small>Тіркелген төлемдер</small>
+          <small>{{ totalPaid() / totalTarget() | percent }}</small>
         </article>
         <article>
           <span>Жалпы қарыз</span>
@@ -120,8 +121,8 @@
           <div class="goal-list">
             <label *ngFor="let item of visibleDistributors()">
               <span>{{ item.city }} · {{ item.company }}</span>
-              <b>{{ progress(item) | percent }}</b>
-              <i><em [style.width.%]="progress(item) * 100"></em></i>
+              <b>{{ paymentProgress(item) | percent }}</b>
+              <i><em [style.width.%]="paymentProgress(item) * 100"></em></i>
             </label>
           </div>
         </article>
@@ -257,6 +258,16 @@
               <span>Лимит: {{ item.creditLimit | kzt }}</span>
               <strong [class.overdue]="item.debt > item.creditLimit * 0.8">{{ item.debt | kzt }}</strong>
             </div>
+            <button type="button" class="card-delete-btn"
+              *ngIf="role() === 'admin'"
+              [disabled]="distributorDeleting()"
+              (click)="deleteDistributor(item.id, $event)">
+              Дистрибьюторды жою
+            </button>
+            <p class="dist-delete-error card-delete-error"
+              *ngIf="distributorDeleteErrorId() === item.id">
+              {{ distributorDeleteError() }}
+            </p>
           </article>
         </div>
       </ng-container>
@@ -289,6 +300,13 @@
               (click)="openMessageModal(selectedDetailDistributor()!.id)">
               ✉ Хабарлама жіберу
             </button>
+            <button type="button" class="btn-pay btn-pay-inline btn-danger-inline"
+              *ngIf="role() === 'admin'"
+              [disabled]="distributorDeleting()"
+              (click)="deleteDistributor(selectedDetailDistributor()!.id)">
+              {{ distributorDeleting() ? 'Удаляется...' : 'Удалить дистрибьютора' }}
+            </button>
+            <p class="dist-delete-error" *ngIf="distributorDeleteError()">{{ distributorDeleteError() }}</p>
           </div>
         </div>
 
@@ -623,7 +641,7 @@
 
         <div class="load-more-wrap" *ngIf="adminFilteredProducts().length > adminDisplayedProducts().length">
           <button type="button" class="load-more-btn" (click)="loadMorePrice()">
-            Тағы 10 жүктеу
+            Тағы 40 жүктеу
             <span class="load-more-count">({{ adminDisplayedProducts().length }} / {{ adminFilteredProducts().length }} кітап)</span>
           </button>
         </div>
@@ -755,8 +773,8 @@
             {{ priceDraftTotal() > remainingLimit() ? 'Лимиттен асады: Admin растауы керек' : 'Лимит ішінде: pending болып жіберіледі' }}
           </div>
 
-          <button type="button" [disabled]="priceDraftItems().length === 0" (click)="createOrderFromPrice()">
-            Тапсырысқа жіберу
+          <button type="button" [disabled]="priceDraftItems().length === 0 || orderCreating()" (click)="createOrderFromPrice()">
+            {{ orderCreating() ? 'Жіберілуде...' : 'Тапсырысқа жіберу' }}
           </button>
         </aside>
       </div>
@@ -772,7 +790,7 @@
             <h2>Тапсырыстар</h2>
             <small class="result-count">{{ selectedDistributor().company }} · {{ selectedDistributor().city }}</small>
           </div>
-          <button type="button" *ngIf="isCurrentMonth()" (click)="navigate('price')" class="btn-new-order">
+          <button type="button" *ngIf="isCurrentMonth()" [disabled]="orderCreating()" (click)="navigate('price')" class="btn-new-order">
             + Жаңа тапсырыс беру
           </button>
         </div>
@@ -805,7 +823,7 @@
         <div class="month-empty-state" *ngIf="distributorCurrentMonthOrders().length === 0">
           <span>📦</span>
           <p>{{ monthLabel(distributorOrderMonth()) }} айында тапсырыс жоқ</p>
-          <button type="button" *ngIf="isCurrentMonth()" (click)="navigate('price')" class="btn-new-order">
+          <button type="button" *ngIf="isCurrentMonth()" [disabled]="orderCreating()" (click)="navigate('price')" class="btn-new-order">
             + Прайс-листтен тапсырыс беру
           </button>
         </div>
@@ -866,7 +884,9 @@
           <label>Саны
             <input type="number" min="1" [(ngModel)]="orderQty">
           </label>
-          <button type="button" (click)="createOrder()">Жылдам тапсырыс</button>
+          <button type="button" [disabled]="orderCreating()" (click)="createOrder()">
+            {{ orderCreating() ? 'Жіберілуде...' : 'Жылдам тапсырыс' }}
+          </button>
         </div>
       </ng-container>
 
@@ -955,42 +975,44 @@
                 <button type="button" [class.active]="orderItemSort() === 'amount'" (click)="orderItemSort.set('amount')">Сома</button>
               </div>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Кітап</th>
-                  <th>Баспа</th>
-                  <th>Жеңілдік</th>
-                  <th>Бағам</th>
-                  <th>Саны</th>
-                  <th>Жол сомасы</th>
-                  <th *ngIf="canEditOrder(selectedOrder()!)"></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let item of sortedOrderItems(); let i = index">
-                  <td>{{ i + 1 }}</td>
-                  <td>
-                    <strong>{{ item.name }}</strong>
-                    <small style="display:block;color:#66736e">{{ item.barcode }}</small>
-                  </td>
-                  <td>{{ item.publisher }}</td>
-                  <td>{{ item.discount | percent }}</td>
-                  <td>{{ item.unitPrice | kzt }}</td>
-                  <td>
-                    <input *ngIf="canEditOrder(selectedOrder()!)" type="number" class="qty-edit-input" min="1"
-                      [ngModel]="item.qty"
-                      (ngModelChange)="updateOrderItemQty(selectedOrder()!.id, item.productId, +$event)">
-                    <span *ngIf="!canEditOrder(selectedOrder()!)">{{ item.qty }}</span>
-                  </td>
-                  <td><strong>{{ item.amount | kzt }}</strong></td>
-                  <td *ngIf="canEditOrder(selectedOrder()!)">
-                    <button type="button" class="rm-btn" (click)="removeOrderItem(selectedOrder()!.id, item.productId)">×</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="order-items-scroll" tabindex="0" role="region" aria-label="Тапсырыс кітаптары">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Кітап</th>
+                    <th>Баспа</th>
+                    <th>Жеңілдік</th>
+                    <th>Бағам</th>
+                    <th>Саны</th>
+                    <th>Жол сомасы</th>
+                    <th *ngIf="canEditOrder(selectedOrder()!)"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let item of sortedOrderItems(); let i = index">
+                    <td>{{ i + 1 }}</td>
+                    <td>
+                      <strong>{{ item.name }}</strong>
+                      <small style="display:block;color:#66736e">{{ item.barcode }}</small>
+                    </td>
+                    <td>{{ item.publisher }}</td>
+                    <td>{{ item.discount | percent }}</td>
+                    <td>{{ item.unitPrice | kzt }}</td>
+                    <td>
+                      <input *ngIf="canEditOrder(selectedOrder()!)" type="number" class="qty-edit-input" min="1"
+                        [ngModel]="item.qty"
+                        (ngModelChange)="updateOrderItemQty(selectedOrder()!.id, item.productId, +$event)">
+                      <span *ngIf="!canEditOrder(selectedOrder()!)">{{ item.qty }}</span>
+                    </td>
+                    <td><strong>{{ item.amount | kzt }}</strong></td>
+                    <td *ngIf="canEditOrder(selectedOrder()!)">
+                      <button type="button" class="rm-btn" (click)="removeOrderItem(selectedOrder()!.id, item.productId)">×</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             <button type="button" class="add-item-btn" *ngIf="canAddItem(selectedOrder()!)" (click)="addItemModal.set(true)">
               + Кітап қосу
             </button>
@@ -1044,6 +1066,11 @@
             <button type="button" class="btn-ghost"
               *ngIf="role() === 'admin' && (selectedOrder()!.status === 'pending' || selectedOrder()!.status === 'draft')"
               (click)="cancelOrder(selectedOrder()!.id)">Бас тарту</button>
+            <button type="button" class="btn-ghost btn-danger-ghost"
+              *ngIf="canHardDeleteOrder(selectedOrder()!)"
+              (click)="permanentlyDeleteOrder(selectedOrder()!.id)">
+              Тапсырысты жою
+            </button>
           </div>
 
           <!-- Дистрибьютор әрекеттері -->
@@ -1285,7 +1312,9 @@
           <input type="text" class="modal-qty-input" [(ngModel)]="paymentNoteStr" placeholder="Банктік аударым, кассалық...">
         </label>
         <div class="modal-actions">
-          <button type="button" class="btn-confirm" (click)="savePayment()">Сақтау</button>
+          <button type="button" class="btn-confirm" [disabled]="paymentSaving()" (click)="savePayment()">
+            {{ paymentSaving() ? 'Сақталуда...' : 'Сақтау' }}
+          </button>
           <button type="button" class="btn-ghost" (click)="paymentModalOpen.set(false)">Бас тарту</button>
         </div>
       </div>

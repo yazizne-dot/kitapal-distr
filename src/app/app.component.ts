@@ -371,9 +371,10 @@ export class AppComponent implements OnInit {
   // Payment recording
   paymentModalOpen = signal(false);
   paymentDistId = signal<number | null>(null);
+  paymentSaving = signal(false);
   paymentAmountStr = '';
   paymentNoteStr = '';
-  paymentDateStr = '2026-06-10';
+  paymentDateStr = this.todayDateKey();
 
   // Price editing
   editingProductId = signal<number | null>(null);
@@ -411,6 +412,10 @@ export class AppComponent implements OnInit {
 
   distributorModal = signal(false);
   distributorSaving = signal(false);
+  distributorDeleting = signal(false);
+  distributorDeleteError = signal('');
+  distributorDeleteErrorId = signal<number | null>(null);
+  orderCreating = signal(false);
   distributorError = '';
   newDistCompany = '';
   newDistCity = '';
@@ -526,7 +531,7 @@ export class AppComponent implements OnInit {
   distributorMenu = [
     ['overview', 'Менің прогресім'],
     ['price', 'Прайс-лист'],
-    ['orders', 'Тапсырыс беру'],
+    ['orders', 'Тапсырыстар'],
     ['debts', 'Қарызым'],
     ['notifications', 'Хабарламалар']
   ];
@@ -589,8 +594,8 @@ export class AppComponent implements OnInit {
     this.visibleOrders().filter(o => o.status === 'pending' || o.status === 'draft')
   );
 
-  selectedOrder = computed(() =>
-    this.visibleOrders().find((order) => order.id === this.selectedOrderId()) ?? this.sortedVisibleOrders()[0]
+  selectedOrder = computed<Order | null>(() =>
+    this.visibleOrders().find((order) => order.id === this.selectedOrderId()) ?? null
   );
 
   // Orders sorted: pending & draft first, then confirmed, shipped, delivered last
@@ -618,7 +623,7 @@ export class AppComponent implements OnInit {
   totalAchieved = computed(() => this.visibleDistributors().reduce((sum, d) => sum + d.achieved, 0));
   totalDebt = computed(() => this.visibleDistributors().reduce((sum, d) => sum + d.debt, 0));
   totalCredit = computed(() => this.visibleDistributors().reduce((sum, d) => sum + d.creditLimit, 0));
-  totalPaid = computed(() => this.payments().reduce((sum, p) => sum + p.amount, 0));
+  totalPaid = computed(() => this.visibleDistributors().reduce((sum, d) => sum + (this.paymentsByDist().get(d.id) ?? 0), 0));
 
   categories = computed(() => ['Барлығы', ...new Set(this.products().map((p) => p.category))]);
   filteredProducts = computed(() => {
@@ -637,7 +642,7 @@ export class AppComponent implements OnInit {
   });
 
   adminFilteredProducts = computed(() => this.filteredProducts());
-  adminDisplayedProducts = computed(() => this.adminFilteredProducts().slice(0, this.priceDisplayCount()));
+  adminDisplayedProducts = computed(() => this.adminFilteredProducts().slice(0, Math.max(this.priceDisplayCount(), 40)));
 
   isColVisible(col: string): boolean {
     return !this.hiddenColumns().includes(col);
@@ -680,10 +685,10 @@ export class AppComponent implements OnInit {
     '2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'
   ];
   // Current active month — distributors cannot go beyond this
-  readonly CURRENT_MONTH = '2026-06';
+  readonly CURRENT_MONTH = this.currentMonthKey();
 
   // Distributor order month selection
-  distributorOrderMonth = signal<string>('2026-06');
+  distributorOrderMonth = signal<string>(this.CURRENT_MONTH);
 
   // Available months for distributor (current + past only)
   distributorAvailableMonths = computed(() => {
@@ -894,7 +899,8 @@ export class AppComponent implements OnInit {
     this.paymentDistId.set(distId);
     this.paymentAmountStr = '';
     this.paymentNoteStr = '';
-    this.paymentDateStr = '2026-06-10';
+    this.paymentDateStr = this.todayDateKey();
+    this.paymentSaving.set(false);
     this.paymentModalOpen.set(true);
   }
 
@@ -917,12 +923,19 @@ export class AppComponent implements OnInit {
   }
 
   async savePayment(): Promise<void> {
+    if (this.paymentSaving()) return;
     const amount = parseFloat(this.paymentAmountStr);
     const distId = this.paymentDistId();
     if (!amount || amount <= 0 || !distId) return;
-    await this.paymentService.add(distId, amount, this.paymentDateStr || '2026-06-10', this.paymentNoteStr);
-    await this.reloadAll();
-    this.paymentModalOpen.set(false);
+    this.paymentSaving.set(true);
+    try {
+      const err = await this.paymentService.add(distId, amount, this.paymentDateStr || this.todayDateKey(), this.paymentNoteStr);
+      if (err) { console.error('savePayment:', err); alert('Төлем сақталмады: ' + err); return; }
+      await this.reloadAll();
+      this.paymentModalOpen.set(false);
+    } finally {
+      this.paymentSaving.set(false);
+    }
   }
 
   paymentsForDist(distId: number): Payment[] {
@@ -1014,6 +1027,35 @@ export class AppComponent implements OnInit {
       this.editingFinancialDistributor = null;
     } finally {
       this.financialSaving.set(false);
+    }
+  }
+
+  async deleteDistributor(distId: number, event?: Event): Promise<void> {
+    event?.stopPropagation();
+    if (this.role() !== 'admin' || this.distributorDeleting()) return;
+    const distributor = this.getDistributorById(distId);
+    if (!distributor) return;
+    const confirmed = confirm(`Удалить дистрибьютора "${distributor.company}"?`);
+    if (!confirmed) return;
+
+    this.distributorDeleteError.set('');
+    this.distributorDeleteErrorId.set(null);
+    this.distributorDeleting.set(true);
+    try {
+      const error = await this.distributorService.deleteIfEmpty(distId);
+      if (error) {
+        this.distributorDeleteError.set(error);
+        this.distributorDeleteErrorId.set(distId);
+        return;
+      }
+
+      await this.reloadAll();
+      this.distributorDetailId.set(null);
+      this.detailActiveMonth.set('all');
+      const firstDistributor = this.visibleDistributors()[0] ?? this.distributors()[0];
+      if (firstDistributor) this.selectedDistributorId.set(firstDistributor.id);
+    } finally {
+      this.distributorDeleting.set(false);
     }
   }
 
@@ -1131,6 +1173,8 @@ export class AppComponent implements OnInit {
   openDistributorDetail(id: number): void {
     this.distributorDetailId.set(id);
     this.detailActiveMonth.set('all');
+    this.distributorDeleteError.set('');
+    this.distributorDeleteErrorId.set(null);
   }
 
   effectiveDiscount(product: Product, distributor = this.selectedDistributor()): number {
@@ -1158,38 +1202,57 @@ export class AppComponent implements OnInit {
     return distributor.target ? distributor.achieved / distributor.target : 0;
   }
 
+  paymentProgress(distributor: Distributor): number {
+    const paid = this.paymentsByDist().get(distributor.id) ?? 0;
+    return distributor.target ? Math.min(1, paid / distributor.target) : 0;
+  }
+
   async createOrder(): Promise<void> {
+    if (this.orderCreating()) return;
     const product = this.products().find((item) => item.id === Number(this.orderProductId)) ?? this.products()[0];
     const distributor = this.selectedDistributor();
     if (!product || !distributor) return;
-    const unitPrice = this.myPrice(product);
-    const discount = this.effectiveDiscount(product);
-    const amount = unitPrice * this.orderQty;
-    const status = decideStatus(distributor.debt, amount, distributor.creditLimit);
-    await this.orderService.create(distributor.id,
-      [{ productId: product.id, qty: this.orderQty, unitPrice, discount }], status);
-    await this.reloadAll();
-    const newest = this.orders().find(o => o.distributorId === distributor.id);
-    if (newest) this.selectedOrderId.set(newest.id);
+    this.orderCreating.set(true);
+    try {
+      const unitPrice = this.myPrice(product);
+      const discount = this.effectiveDiscount(product);
+      const amount = unitPrice * this.orderQty;
+      const status = decideStatus(distributor.debt, amount, distributor.creditLimit);
+      const err = await this.orderService.create(distributor.id,
+        [{ productId: product.id, qty: this.orderQty, unitPrice, discount }], status);
+      if (err) { console.error('createOrder:', err); alert('Тапсырыс жіберілмеді: ' + err); return; }
+      await this.reloadAll();
+      this.distributorOrderMonth.set(this.CURRENT_MONTH);
+      const newest = this.orders().find(o => o.distributorId === distributor.id);
+      if (newest) this.selectedOrderId.set(newest.id);
+    } finally {
+      this.orderCreating.set(false);
+    }
   }
 
   async createOrderFromPrice(): Promise<void> {
     const items = this.priceDraftItems();
-    if (items.length === 0) return;
+    if (items.length === 0 || this.orderCreating()) return;
     const distributor = this.selectedDistributor();
     if (!distributor) return;
-    const amount = this.priceDraftTotal();
-    const status = decideStatus(distributor.debt, amount, distributor.creditLimit);
-    const err = await this.orderService.create(distributor.id, items.map((item) => ({
-      productId: item.product.id, qty: item.qty,
-      unitPrice: this.myPrice(item.product), discount: this.effectiveDiscount(item.product),
-    })), status);
-    if (err) { console.error('createOrderFromPrice:', err); alert('Тапсырыс жіберілмеді: ' + err); return; }
-    await this.reloadAll();
-    this.priceQuantities.set({});
-    const newest = this.orders().find(o => o.distributorId === distributor.id);
-    if (newest) this.selectedOrderId.set(newest.id);
-    this.activeScreen.set('orders');
+    this.orderCreating.set(true);
+    try {
+      const amount = this.priceDraftTotal();
+      const status = decideStatus(distributor.debt, amount, distributor.creditLimit);
+      const err = await this.orderService.create(distributor.id, items.map((item) => ({
+        productId: item.product.id, qty: item.qty,
+        unitPrice: this.myPrice(item.product), discount: this.effectiveDiscount(item.product),
+      })), status);
+      if (err) { console.error('createOrderFromPrice:', err); alert('Тапсырыс жіберілмеді: ' + err); return; }
+      await this.reloadAll();
+      this.priceQuantities.set({});
+      this.distributorOrderMonth.set(this.CURRENT_MONTH);
+      const newest = this.orders().find(o => o.distributorId === distributor.id);
+      if (newest) this.selectedOrderId.set(newest.id);
+      this.activeScreen.set('orders');
+    } finally {
+      this.orderCreating.set(false);
+    }
   }
 
   openOrder(orderId: string): void {
@@ -1232,7 +1295,8 @@ export class AppComponent implements OnInit {
   }
 
   loadMorePrice(): void {
-    this.priceDisplayCount.update(n => n + (this.priceViewMode() === 'grid' ? 8 : 40));
+    const step = this.role() !== 'distributor' ? 40 : (this.priceViewMode() === 'grid' ? 8 : 40);
+    this.priceDisplayCount.update(n => n + step);
   }
 
   statusLabel(status: OrderStatus): string {
@@ -1272,19 +1336,27 @@ export class AppComponent implements OnInit {
       ['pending', 'draft'].includes(order.status);
   }
 
+  canHardDeleteOrder(order: Order): boolean {
+    if (this.role() === 'admin' || this.role() === 'manager') return true;
+    return this.role() === 'distributor' &&
+      order.distributorId === this.selectedDistributorId() && ['pending', 'draft', 'cancelled'].includes(order.status);
+  }
+
   async distributorCancelOrder(orderId: string): Promise<void> {
-    await this.updateOrderStatus(orderId, 'cancelled', 'Дистрибьютор тапсырысты жойды');
+    await this.permanentlyDeleteOrder(orderId);
   }
 
   async permanentlyDeleteOrder(orderId: string): Promise<void> {
     const order = this.orders().find(o => o.id === orderId);
-    if (!order?.uuid) return;
-    if (this.selectedOrderId() === orderId) {
-      this.selectedOrderId.set('');
-    }
+    if (!order?.uuid || !this.canHardDeleteOrder(order)) return;
     const err = await this.orderService.hardDelete(order.uuid);
     if (err) { console.error('permanentlyDeleteOrder:', err); return; }
     await this.reloadAll();
+    if (this.selectedOrderId() === orderId) {
+      this.selectedOrderId.set('');
+      this.addItemModal.set(false);
+      this.shipModal.set(false);
+    }
   }
 
   async removeOrderItem(orderId: string, productId: number): Promise<void> {
@@ -1731,5 +1803,15 @@ h1{text-align:center;font-size:10pt;font-weight:bold;text-transform:uppercase;ma
 
   deliverOrder(orderId: string): void {
     this.updateOrderStatus(orderId, 'delivered', 'Дистрибьютор тапсырысты алды');
+  }
+
+  private currentMonthKey(): string {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  private todayDateKey(): string {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   }
 }
