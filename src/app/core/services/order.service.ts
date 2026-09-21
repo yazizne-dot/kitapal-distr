@@ -13,13 +13,21 @@ export class OrderService {
   readonly orders = signal<Order[]>([]);
 
   async load(): Promise<void> {
-    const { data, error } = await supabase
+    const pageSize = 500;
+    const data: any[] = [];
+    for (let from = 0; ; from += pageSize) {
+    const { data: page, error } = await supabase
       .from('orders')
       .select('id, order_code, distributor_id, status, created_at, ' +
               'order_items(id, product_id, qty, unit_price, discount, amount, products(name, barcode, publisher)), ' +
               'order_history(status, note, changed_at)')
-      .order('created_at', { ascending: false });
-    if (error || !data) return;
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, from + pageSize - 1);
+      if (error || !page) return;
+      data.push(...page);
+      if (page.length < pageSize) break;
+    }
     this.orders.set(data.map((o: any) => ({
       id: o.id, order_code: o.order_code, distributor_id: o.distributor_id,
       status: o.status, created_at: o.created_at,

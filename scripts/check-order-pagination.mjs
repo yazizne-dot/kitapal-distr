@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const source=readFileSync(new URL('../src/app/core/services/order.service.ts',import.meta.url),'utf8');
+const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}}).outputText;
+const ranges=[];
+const rows=Array.from({length:1201},(_,i)=>({id:String(i),order_items:[],order_history:[]}));
+const query={select(){return this;},order(){return this;},async range(a,b){ranges.push([a,b]);return {data:rows.slice(a,b+1),error:null};}};
+const signal=value=>{const f=()=>value;f.set=v=>value=v;return f;};
+const exports={};
+new Function('require','exports',js)(name=>{
+ if(name==='@angular/core')return {Injectable:()=>c=>c,signal};
+ if(name.includes('supabase.client'))return {supabase:{from:()=>query}};
+ if(name.includes('order-pricing'))return {lineAmount:(q,p)=>q*p};
+ throw new Error(name);
+},exports);
+const service=new exports.OrderService();
+await service.load();
+assert.equal(service.orders().length,1201);
+assert.deepEqual(ranges,[[0,499],[500,999],[1000,1499]]);
+console.log('Pagination: all 1201 orders loaded across three pages');

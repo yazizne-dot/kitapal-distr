@@ -103,7 +103,7 @@
         <article>
           <span>Жалпы қарыз</span>
           <strong>{{ totalDebt() | kzt }}</strong>
-          <small>қарыздар + төлемдер</small>
+          <small>Төлемдер шегерілген қарыз</small>
         </article>
         <article>
           <span>Кредит лимит</span>
@@ -836,7 +836,7 @@
             <h2>Тапсырыстар</h2>
           </div>
           <div class="head-actions">
-            <select [ngModel]="selectedDistributorId()" (ngModelChange)="selectedDistributorId.set(+$event)">
+            <select [ngModel]="orderFilterDistributorId()" (ngModelChange)="setOrderDistributorFilter(+$event)">
               <option value="0">— Барлық дистрибьюторлар —</option>
               <option *ngFor="let item of visibleDistributors()" [value]="item.id">{{ item.company }}</option>
             </select>
@@ -850,7 +850,7 @@
               [class.active]="managerOrderMonth() === 'all'"
               (click)="managerOrderMonth.set('all')">
               Барлығы
-              <span class="mtab-badge">{{ sortedVisibleOrders().length }}</span>
+              <span class="mtab-badge">{{ managerDistributorOrders().length }}</span>
             </button>
             <button type="button" class="month-tab"
               *ngFor="let m of managerAvailableMonths()"
@@ -876,6 +876,11 @@
         </div>
 
         <div class="entry-card" *ngIf="role() === 'admin'">
+          <label>Дистрибьютор
+            <select [ngModel]="selectedDistributorId()" (ngModelChange)="selectedDistributorId.set(+$event)">
+              <option *ngFor="let item of visibleDistributors()" [value]="item.id">{{ item.company }}</option>
+            </select>
+          </label>
           <label>Кітап
             <select [(ngModel)]="orderProductId">
               <option *ngFor="let product of products().slice(0, 80)" [value]="product.id">{{ product.name }}</option>

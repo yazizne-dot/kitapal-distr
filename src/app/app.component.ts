@@ -586,6 +586,7 @@ export class AppComponent implements OnInit {
   );
 
   visibleOrders = computed(() => {
+    if (this.role() === 'admin') return this.orders();
     const allowed = new Set(this.visibleDistributors().map((item) => item.id));
     return this.orders().filter((order) => allowed.has(order.distributorId));
   });
@@ -723,11 +724,23 @@ export class AppComponent implements OnInit {
 
   // Manager monthly filter
   managerOrderMonth = signal<string>('all');
+  orderFilterDistributorId = signal(0);
+
+  managerDistributorOrders = computed(() => {
+    const id = this.orderFilterDistributorId();
+    return this.sortedVisibleOrders().filter(o => id === 0 || o.distributorId === id);
+  });
+
+  setOrderDistributorFilter(id: number): void {
+    this.orderFilterDistributorId.set(id);
+    this.managerOrderMonth.set('all');
+    this.selectedOrderId.set('');
+  }
 
   // months that appear in manager's order list (for tab badges)
   managerOrderMonthCounts = computed(() => {
     const map: Record<string, number> = {};
-    this.sortedVisibleOrders().forEach(o => {
+    this.managerDistributorOrders().forEach(o => {
       const m = o.createdAt.substring(0, 7);
       map[m] = (map[m] ?? 0) + 1;
     });
@@ -742,11 +755,7 @@ export class AppComponent implements OnInit {
   // Admin/manager orders list — filtered by month and optionally by distributor
   adminManagerOrders = computed(() => {
     const m = this.managerOrderMonth();
-    const distId = this.role() !== 'distributor' ? this.selectedDistributorId() : 0;
-    let list = this.sortedVisibleOrders();
-    if (m !== 'all') list = list.filter(o => o.createdAt.startsWith(m));
-    if (distId > 0) list = list.filter(o => o.distributorId === distId);
-    return list;
+    return this.managerDistributorOrders().filter(o => m === 'all' || o.createdAt.startsWith(m));
   });
 
   selectedDetailDistributor = computed(() => {
@@ -1166,6 +1175,9 @@ export class AppComponent implements OnInit {
   }
 
   navigate(screen: string): void {
+    if (screen === 'orders' && this.role() !== 'distributor') {
+      this.setOrderDistributorFilter(0);
+    }
     this.activeScreen.set(screen);
     this.distributorDetailId.set(null);
     this.detailActiveMonth.set('all');
