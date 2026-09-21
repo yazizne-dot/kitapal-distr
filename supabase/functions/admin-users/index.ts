@@ -71,9 +71,23 @@ Deno.serve(async (req) => {
 
   if (action === 'update') {
     if (!body.id) return json({ error: 'id required' }, 400);
-    if (body.password) {
-      const { error } = await admin.auth.admin.updateUserById(body.id, { password: body.password });
-      if (error) return json({ error: error.message }, 400);
+    const login = body.login === undefined ? undefined : String(body.login).trim().toLowerCase();
+    if (login !== undefined && !/^[a-z0-9][a-z0-9._-]*$/.test(login)) {
+      return json({ error: 'Логинге латын әріптері, сандар, нүкте, сызықша немесе астын сызу белгісін енгізіңіз.' }, 400);
+    }
+    const authPatch: { email?: string; email_confirm?: boolean; password?: string } = {};
+    if (login !== undefined) {
+      authPatch.email = `${login}@kitapal.kz`;
+      authPatch.email_confirm = true;
+    }
+    if (body.password) authPatch.password = body.password;
+    if (Object.keys(authPatch).length > 0) {
+      const { error } = await admin.auth.admin.updateUserById(body.id, authPatch);
+      if (error) {
+        const duplicate = ['email_exists', 'user_already_exists'].includes(error.code ?? '')
+          || /already.*(registered|exists)/i.test(error.message);
+        return json({ error: duplicate ? 'Бұл логин басқа пайдаланушыда бар.' : error.message }, 400);
+      }
     }
     const { error: pErr } = await admin.from('profiles').update({
       full_name: body.name,
@@ -81,7 +95,7 @@ Deno.serve(async (req) => {
       distributor_id: body.role === 'distributor' ? body.distributor_id ?? null : null,
     }).eq('id', body.id);
     if (pErr) return json({ error: pErr.message }, 400);
-    return json({ ok: true });
+    return json({ ok: true, login });
   }
 
   if (action === 'delete') {

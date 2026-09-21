@@ -29,11 +29,20 @@ export class AccountService {
     return null;
   }
 
-  async update(id: string, name: string, role: Role, distributorId: number | null, password: string): Promise<string | null> {
-    const { error } = await supabase.functions.invoke('admin-users', {
-      body: { action: 'update', id, name, role, distributor_id: distributorId, password: password || undefined },
+  async update(id: string, login: string, name: string, role: Role, distributorId: number | null, password: string): Promise<string | null> {
+    const normalizedLogin = login.trim().toLowerCase();
+    const { data, error } = await supabase.functions.invoke('admin-users', {
+      body: { action: 'update', id, login: normalizedLogin, name, role, distributor_id: distributorId, password: password || undefined },
     });
-    if (error) return 'Жаңарту қатесі';
+    if (error) {
+      const context = (error as { context?: Response }).context;
+      const details = await context?.json().catch(() => null);
+      return details?.error ?? 'Жаңарту қатесі';
+    }
+    if (data?.error) return data.error;
+    if (data?.login !== normalizedLogin) {
+      return 'Логин сақталмады. Сервердегі admin-users функциясын жаңарту қажет.';
+    }
     await this.load();
     return null;
   }

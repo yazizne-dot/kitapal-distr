@@ -1162,7 +1162,7 @@ export class AppComponent implements OnInit {
     if (!this.newAccLogin.trim() || !this.newAccName.trim()) return;
     const distId = this.newAccRole === 'distributor' ? Number(this.newAccDistributorId) : null;
     const err = this.editingAccountId != null
-      ? await this.accountService.update(this.editingAccountId, this.newAccName.trim(), this.newAccRole, distId, this.newAccPassword)
+      ? await this.accountService.update(this.editingAccountId, this.newAccLogin.trim(), this.newAccName.trim(), this.newAccRole, distId, this.newAccPassword)
       : await this.accountService.create(this.newAccLogin.trim(), this.newAccName.trim(), this.newAccRole, distId, this.newAccPassword);
     if (err) { this.accountError = err; return; }
     await this.reloadAll();
