@@ -574,8 +574,7 @@
             {{ filteredProducts().length }} кітап табылды · {{ products().length }} кітап прайста
           </small>
         </div>
-        <div class="search-and-toggle">
-          <button type="button" class="btn-confirm" *ngIf="role() === 'admin' || role() === 'manager'" (click)="openCreateProduct()">+ Жаңа кітап қосу</button>
+        <div class="search-and-toggle price-toolbar">
           <label class="search">
             Іздеу
             <input
@@ -585,6 +584,7 @@
               (ngModelChange)="productQuery.set($event); priceDisplayCount.set(priceViewMode() === 'grid' ? 8 : 40)"
             >
           </label>
+          <button type="button" class="btn-confirm add-product-button" *ngIf="role() === 'admin' || role() === 'manager'" (click)="openCreateProduct()">+ Жаңа кітап қосу</button>
           <div class="view-toggle" *ngIf="role() === 'distributor'">
             <button type="button" [class.active]="priceViewMode() === 'list'" (click)="priceViewMode.set('list'); priceDisplayCount.set(40)" title="Тізім">
               <span class="icon-list">
@@ -1504,7 +1504,10 @@
         <p *ngIf="creatingProduct()">Әр дистрибьютордың өз жеңілдігі автоматты қолданылады.</p>
         <p *ngIf="productError" role="alert" style="color:#c0392b">{{ productError }}</p>
         <div class="modal-actions">
-          <button type="button" class="btn-confirm" [disabled]="productSaving()" (click)="saveEditProduct()">{{ productSaving() ? 'Сақталуда...' : 'Сақтау' }}</button>
+          <button type="button" class="btn-ghost btn-danger-ghost"
+            *ngIf="editingProductId() && !creatingProduct() && (role() === 'admin' || role() === 'manager')"
+            [disabled]="productSaving()" (click)="deleteEditedProduct()">Кітапты прайстан жою</button>
+          <button type="button" class="btn-confirm" [disabled]="productSaving()" (click)="saveEditProduct()">{{ productSaving() ? 'Күтіңіз...' : 'Сақтау' }}</button>
           <button type="button" class="btn-ghost" [disabled]="productSaving()" (click)="closeProductModal()">Бас тарту</button>
         </div>
       </div>

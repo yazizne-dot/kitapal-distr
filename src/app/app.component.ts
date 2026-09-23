@@ -901,6 +901,36 @@ export class AppComponent implements OnInit {
     this.editProdBasePrice = product.basePrice;
   }
 
+  async deleteEditedProduct(): Promise<void> {
+    if (this.productSaving() || (this.role() !== 'admin' && this.role() !== 'manager')) return;
+    const id = this.editingProductId();
+    const product = this.products().find(p => p.id === id);
+    if (!id || !product || this.creatingProduct()) return;
+    this.productError = '';
+    if (product.barcode === 'OPENING-BALANCE') {
+      this.productError = 'Бастапқы сальдо қызметтік жазбасын жоюға болмайды.';
+      return;
+    }
+    if (!confirm(`«${product.name}» кітабын прайстан жоясыз ба?`)) return;
+    this.productSaving.set(true);
+    try {
+      const error = await this.productService.remove(id);
+      if (error) { this.productError = error; return; }
+      this.priceQuantities.update(quantities => {
+        const next = { ...quantities };
+        delete next[id];
+        return next;
+      });
+      await this.reloadAll();
+      this.editingProductId.set(null);
+      this.productQuery.set('');
+    } catch {
+      this.productError = 'Кітапты жою мүмкін болмады. Байланысты тексеріп, қайта көріңіз.';
+    } finally {
+      this.productSaving.set(false);
+    }
+  }
+
   async saveEditProduct(): Promise<void> {
     if (this.productSaving()) return;
     if (this.role() !== 'admin' && !(this.role() === 'manager' && this.creatingProduct())) return;

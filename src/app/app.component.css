@@ -4107,3 +4107,37 @@ td,
     width: 100%;
   }
 }
+
+/* Price search fills the row; the add action stays compact at the right. */
+.search-and-toggle.price-toolbar {
+  align-items: end;
+  grid-template-columns: minmax(0, 1fr) auto;
+  max-width: none;
+  width: 100%;
+}
+
+.price-toolbar .search input {
+  min-width: 0;
+  width: 100%;
+}
+
+.section-head .price-toolbar .add-product-button {
+  align-self: end;
+  font-size: 13px;
+  justify-self: end;
+  min-height: 38px;
+  padding: 0 12px;
+  white-space: nowrap;
+  width: auto;
+}
+
+@media (max-width: 520px) {
+  .price-toolbar .search {
+    grid-column: 1 / -1;
+  }
+
+  .price-toolbar .add-product-button,
+  .price-toolbar .view-toggle {
+    grid-column: 2;
+  }
+}
