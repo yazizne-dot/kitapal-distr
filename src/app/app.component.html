@@ -693,6 +693,9 @@
                   <td class="price-cell-list">
                     <strong class="my-price-cell">{{ myPrice(product) | kzt }}</strong>
                     <small class="base-price-sub">{{ product.basePrice | kzt }}</small>
+                    <small class="product-discount-label">
+                      {{ product.discountOverride != null ? 'Бекітілген жеңілдік' : 'Жеңілдік' }}: {{ effectiveDiscount(product) | percent:'1.0-1' }}
+                    </small>
                   </td>
                   <td class="qty-cell-list">
                     <div class="qty-row-sm">
@@ -723,6 +726,7 @@
                 </div>
                 <div class="price-lines">
                   <span>Негізгі баға <b>{{ product.basePrice | kzt }}</b></span>
+                  <span class="product-discount-label">{{ product.discountOverride != null ? 'Бекітілген жеңілдік' : 'Жеңілдік' }}: {{ effectiveDiscount(product) | percent:'1.0-1' }}</span>
                   <span class="my-price">Менің бағам <b>{{ myPrice(product) | kzt }}</b></span>
                 </div>
                 <div class="qty-row">
@@ -762,6 +766,7 @@
               <div>
                 <strong>{{ item.product.name }}</strong>
                 <span>{{ item.qty }} дана × {{ myPrice(item.product) | kzt }}</span>
+                <small class="product-discount-label">{{ item.product.discountOverride != null ? 'Бекітілген жеңілдік' : 'Жеңілдік' }}: {{ effectiveDiscount(item.product) | percent:'1.0-1' }}</small>
               </div>
               <b>{{ item.amount | kzt }}</b>
             </article>
