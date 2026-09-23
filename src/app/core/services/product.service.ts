@@ -19,6 +19,13 @@ export class ProductService {
     this.products.set(all);
   }
 
+  async create(input: Pick<Product, 'name' | 'barcode' | 'publisher' | 'category' | 'base_price'>): Promise<string | null> {
+    const { error } = await supabase.from('products').insert({ ...input, discount_override: null });
+    if (error) return error.code === '23505' ? 'Бұл штрихкодпен кітап бұрыннан бар.' : error.message;
+    await this.load();
+    return null;
+  }
+
   async update(id: number, patch: Partial<Product>): Promise<string | null> {
     const { error } = await supabase.from('products').update(patch).eq('id', id);
     if (error) return error.message;

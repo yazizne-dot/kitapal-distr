@@ -379,6 +379,9 @@ export class AppComponent implements OnInit {
 
   // Price editing
   editingProductId = signal<number | null>(null);
+  creatingProduct = signal(false);
+  productSaving = signal(false);
+  productError = '';
   editProdName = '';
   editProdPublisher = '';
   editProdBarcode = '';
@@ -868,7 +871,28 @@ export class AppComponent implements OnInit {
     this.confirmPwd = '';
   }
 
+  openCreateProduct(): void {
+    if (this.role() !== 'admin' && this.role() !== 'manager') return;
+    this.editingProductId.set(null);
+    this.creatingProduct.set(true);
+    this.productError = '';
+    this.editProdName = '';
+    this.editProdPublisher = '';
+    this.editProdBarcode = '';
+    this.editProdCategory = 'Кітаптар';
+    this.editProdBasePrice = 0;
+  }
+
+  closeProductModal(): void {
+    if (this.productSaving()) return;
+    this.editingProductId.set(null);
+    this.creatingProduct.set(false);
+    this.productError = '';
+  }
+
   openEditProduct(product: Product): void {
+    this.creatingProduct.set(false);
+    this.productError = '';
     this.editingProductId.set(product.id);
     this.editProdName = product.name;
     this.editProdPublisher = product.publisher;
@@ -878,17 +902,46 @@ export class AppComponent implements OnInit {
   }
 
   async saveEditProduct(): Promise<void> {
+    if (this.productSaving()) return;
+    if (this.role() !== 'admin' && !(this.role() === 'manager' && this.creatingProduct())) return;
     const id = this.editingProductId();
-    if (!id) return;
-    const patch: Record<string, unknown> = {};
-    if (this.editProdName.trim()) patch['name'] = this.editProdName.trim();
-    if (this.editProdPublisher.trim()) patch['publisher'] = this.editProdPublisher.trim();
-    if (this.editProdBarcode.trim()) patch['barcode'] = this.editProdBarcode.trim();
-    if (this.editProdCategory.trim()) patch['category'] = this.editProdCategory.trim();
-    if (Number(this.editProdBasePrice) > 0) patch['base_price'] = Number(this.editProdBasePrice);
-    await this.productService.update(id, patch);
-    await this.reloadAll();
-    this.editingProductId.set(null);
+    const creating = this.creatingProduct();
+    if (!creating && !id) return;
+    const input = {
+      name: this.editProdName.trim(), barcode: this.editProdBarcode.trim(),
+      publisher: this.editProdPublisher.trim(), category: this.editProdCategory.trim(),
+      base_price: Number(this.editProdBasePrice),
+    };
+    this.productError = '';
+    if (!input.name || !input.barcode || !input.publisher) {
+      this.productError = 'Кітап атауын, штрихкодын және баспасын толтырыңыз.';
+      return;
+    }
+    if (!Number.isFinite(input.base_price) || input.base_price <= 0) {
+      this.productError = 'Негізгі баға нөлден үлкен болуы керек.';
+      return;
+    }
+    if (this.products().some(p => p.barcode === input.barcode && p.id !== id)) {
+      this.productError = 'Бұл штрихкодпен кітап бұрыннан бар.';
+      return;
+    }
+    this.productSaving.set(true);
+    try {
+      const error = creating ? await this.productService.create(input) : await this.productService.update(id!, input);
+      if (error) { this.productError = error; return; }
+      await this.reloadAll();
+      if (creating) {
+        this.selectedCategory.set('Барлығы');
+        this.productQuery.set(input.barcode);
+        this.priceDisplayCount.set(40);
+      }
+      this.editingProductId.set(null);
+      this.creatingProduct.set(false);
+    } catch {
+      this.productError = 'Кітап сақталмады. Байланысты тексеріп, қайта көріңіз.';
+    } finally {
+      this.productSaving.set(false);
+    }
   }
 
   monthLabel(month: string): string {

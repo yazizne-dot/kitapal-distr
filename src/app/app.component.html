@@ -575,6 +575,7 @@
           </small>
         </div>
         <div class="search-and-toggle">
+          <button type="button" class="btn-confirm" *ngIf="role() === 'admin' || role() === 'manager'" (click)="openCreateProduct()">+ Жаңа кітап қосу</button>
           <label class="search">
             Іздеу
             <input
@@ -606,7 +607,6 @@
           <span class="col-vis-label">Бағандар:</span>
           <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('barcode')" (click)="toggleColumn('barcode')">Штрихкод</button>
           <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('publisher')" (click)="toggleColumn('publisher')">Баспасы</button>
-          <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('category')" (click)="toggleColumn('category')">Санаты</button>
           <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('basePrice')" (click)="toggleColumn('basePrice')">Негізгі баға</button>
           <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('myPrice')" (click)="toggleColumn('myPrice')">Менің бағам</button>
           <button type="button" class="col-chip-reset" *ngIf="hiddenColumns().length > 0" (click)="hiddenColumns.set([])">Барлығын қайтару</button>
@@ -618,7 +618,6 @@
               <th *ngIf="isColVisible('barcode')">Штрихкод / ISBN</th>
               <th>Кітап атауы</th>
               <th *ngIf="isColVisible('publisher')">Баспасы</th>
-              <th *ngIf="isColVisible('category')">Санаты</th>
               <th *ngIf="isColVisible('basePrice')">Негізгі баға</th>
               <th *ngIf="isColVisible('myPrice')">Менің бағам (40%)</th>
               <th *ngIf="role() === 'admin' || role() === 'manager'"></th>
@@ -629,7 +628,6 @@
               <td *ngIf="isColVisible('barcode')"><small class="barcode-cell">{{ product.barcode }}</small></td>
               <td><strong>{{ product.name }}</strong></td>
               <td *ngIf="isColVisible('publisher')">{{ product.publisher }}</td>
-              <td *ngIf="isColVisible('category')">{{ product.category }}</td>
               <td *ngIf="isColVisible('basePrice')">{{ product.basePrice | kzt }}</td>
               <td *ngIf="isColVisible('myPrice')"><strong class="my-price-cell">{{ myPrice(product) | kzt }}</strong></td>
               <td *ngIf="role() === 'admin' || role() === 'manager'">
@@ -1481,11 +1479,11 @@
     </section>
 
     <!-- ══ PRODUCT EDIT MODAL ══ -->
-    <div class="modal-overlay" *ngIf="editingProductId()">
+    <div class="modal-overlay" *ngIf="editingProductId() || creatingProduct()">
       <div class="modal acc-modal">
         <div class="modal-head">
-          <h3>Кітапты өңдеу</h3>
-          <button type="button" class="modal-close" (click)="editingProductId.set(null)">✕</button>
+          <h3>{{ creatingProduct() ? 'Жаңа кітап қосу' : 'Кітапты өңдеу' }}</h3>
+          <button type="button" class="modal-close" [disabled]="productSaving()" (click)="closeProductModal()">✕</button>
         </div>
         <label class="modal-field-label">
           Кітап атауы
@@ -1500,16 +1498,14 @@
           <input class="modal-qty-input" [(ngModel)]="editProdBarcode">
         </label>
         <label class="modal-field-label">
-          Санаты
-          <input class="modal-qty-input" [(ngModel)]="editProdCategory">
+          Жеңілдіксіз негізгі баға (₸)
+          <input type="number" min="0.01" step="0.01" class="modal-qty-input" [(ngModel)]="editProdBasePrice">
         </label>
-        <label class="modal-field-label">
-          Негізгі баға (₸)
-          <input type="number" class="modal-qty-input" [(ngModel)]="editProdBasePrice">
-        </label>
+        <p *ngIf="creatingProduct()">Әр дистрибьютордың өз жеңілдігі автоматты қолданылады.</p>
+        <p *ngIf="productError" role="alert" style="color:#c0392b">{{ productError }}</p>
         <div class="modal-actions">
-          <button type="button" class="btn-confirm" (click)="saveEditProduct()">Сақтау</button>
-          <button type="button" class="btn-ghost" (click)="editingProductId.set(null)">Бас тарту</button>
+          <button type="button" class="btn-confirm" [disabled]="productSaving()" (click)="saveEditProduct()">{{ productSaving() ? 'Сақталуда...' : 'Сақтау' }}</button>
+          <button type="button" class="btn-ghost" [disabled]="productSaving()" (click)="closeProductModal()">Бас тарту</button>
         </div>
       </div>
     </div>
