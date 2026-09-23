@@ -4141,3 +4141,13 @@ td,
     grid-column: 2;
   }
 }
+
+.fixed-discount-label {
+  color: #8f205f;
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-top: 5px;
+  white-space: normal;
+}
