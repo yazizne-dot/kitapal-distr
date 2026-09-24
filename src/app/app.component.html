@@ -716,7 +716,8 @@
           <div class="price-card-grid" *ngIf="priceViewMode() === 'grid'">
             <article class="price-card" *ngFor="let product of displayedProducts()">
               <div class="book-cover">
-                <span>{{ product.category }}</span>
+                <img *ngIf="product.coverUrl; else noBookCover" [src]="product.coverUrl" [alt]="product.name" loading="lazy" (error)="product.coverUrl = undefined">
+                <ng-template #noBookCover><span>Мұқаба жоқ</span></ng-template>
               </div>
               <div class="price-card-body">
                 <div>
@@ -1492,20 +1493,29 @@
         </div>
         <label class="modal-field-label">
           Кітап атауы
-          <input class="modal-qty-input" [(ngModel)]="editProdName">
+          <input class="modal-qty-input" [(ngModel)]="editProdName" [disabled]="productSaving() || (role() === 'manager' && !creatingProduct())">
         </label>
         <label class="modal-field-label">
           Баспасы
-          <input class="modal-qty-input" [(ngModel)]="editProdPublisher">
+          <input class="modal-qty-input" [(ngModel)]="editProdPublisher" [disabled]="productSaving() || (role() === 'manager' && !creatingProduct())">
         </label>
         <label class="modal-field-label">
           Штрихкод / ISBN
-          <input class="modal-qty-input" [(ngModel)]="editProdBarcode">
+          <input class="modal-qty-input" [(ngModel)]="editProdBarcode" [disabled]="productSaving() || (role() === 'manager' && !creatingProduct())">
         </label>
         <label class="modal-field-label">
           Жеңілдіксіз негізгі баға (₸)
-          <input type="number" min="0.01" step="0.01" class="modal-qty-input" [(ngModel)]="editProdBasePrice">
+          <input type="number" min="0.01" step="0.01" class="modal-qty-input" [(ngModel)]="editProdBasePrice" [disabled]="productSaving() || (role() === 'manager' && !creatingProduct())">
         </label>
+        <div class="cover-editor" *ngIf="!creatingProduct()">
+          <label class="modal-field-label">Кітап мұқабасы
+            <input type="file" accept="image/jpeg,image/png" [disabled]="productSaving()" (change)="selectProductCover($event)">
+          </label>
+          <small>JPG немесе PNG, 5 МБ дейін. Таңдағаннан кейін «Сақтау» басыңыз.</small>
+          <img *ngIf="editCoverPreview" [src]="editCoverPreview" alt="Кітап мұқабасының алдын ала көрінісі">
+          <button type="button" class="btn-ghost" *ngIf="editCoverPreview" [disabled]="productSaving()" (click)="removeProductCover()">Суретті алып тастау</button>
+        </div>
+        <p *ngIf="creatingProduct()">Кітапты сақтағаннан кейін «Өңдеу» арқылы мұқабасын жүктей аласыз.</p>
         <p *ngIf="creatingProduct()">Әр дистрибьютордың өз жеңілдігі автоматты қолданылады.</p>
         <p *ngIf="productError" role="alert" style="color:#c0392b">{{ productError }}</p>
         <div class="modal-actions">

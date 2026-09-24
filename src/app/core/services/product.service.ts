@@ -4,6 +4,30 @@ import { Product } from '../models/product';
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
+  coverUrl(path?: string | null): string | undefined {
+    return path ? supabase.storage.from('book-covers').getPublicUrl(path).data.publicUrl : undefined;
+  }
+
+  async saveCover(id: number, file: File | null): Promise<string | null> {
+    const previous = this.products().find(p => p.id === id)?.cover_path;
+    let path: string | null = null;
+    if (file) {
+      const extension = ({ 'image/jpeg': 'jpg', 'image/png': 'png' } as Record<string, string>)[file.type];
+      if (!extension || file.size > 5 * 1024 * 1024) return 'JPG немесе PNG суретін таңдаңыз (5 МБ дейін).';
+      path = `${id}/${crypto.randomUUID()}.${extension}`;
+      const upload = await supabase.storage.from('book-covers').upload(path, file, { contentType: file.type, upsert: false });
+      if (upload.error) return 'Сурет жүктелмеді. Қайта көріңіз.';
+    }
+    const { error } = await supabase.rpc('set_product_cover', { product_id: id, object_path: path });
+    if (error) {
+      if (path) await supabase.storage.from('book-covers').remove([path]);
+      return 'Сурет сақталмады. Қайта көріңіз.';
+    }
+    if (previous && previous !== path) await supabase.storage.from('book-covers').remove([previous]);
+    await this.load();
+    return null;
+  }
+
   readonly products = signal<Product[]>([]);
 
   async load(): Promise<void> {

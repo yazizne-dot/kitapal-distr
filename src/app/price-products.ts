@@ -6,6 +6,7 @@ export type Product = {
   category: string;
   basePrice: number;
   discountOverride?: number;
+  coverUrl?: string;
 };
 
 export const products: Product[] = [

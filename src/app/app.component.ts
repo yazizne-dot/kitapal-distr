@@ -387,6 +387,38 @@ export class AppComponent implements OnInit {
   editProdBarcode = '';
   editProdCategory = '';
   editProdBasePrice = 0;
+  editCoverFile: File | null = null;
+  editCoverPreview = '';
+  editCoverChanged = false;
+
+  private resetCoverPreview(url = ''): void {
+    if (this.editCoverPreview.startsWith('blob:')) URL.revokeObjectURL(this.editCoverPreview);
+    this.editCoverPreview = url;
+    this.editCoverFile = null;
+    this.editCoverChanged = false;
+  }
+
+  selectProductCover(event: Event): void {
+    if (this.productSaving() || !['admin', 'manager'].includes(this.role())) return;
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      this.productError = 'JPG немесе PNG суретін таңдаңыз (5 МБ дейін).';
+      return;
+    }
+    this.resetCoverPreview(URL.createObjectURL(file));
+    this.editCoverFile = file;
+    this.editCoverChanged = true;
+    this.productError = '';
+  }
+
+  removeProductCover(): void {
+    if (this.productSaving()) return;
+    this.resetCoverPreview();
+    this.editCoverChanged = true;
+  }
 
   // Column visibility for admin price table
   hiddenColumns = signal<string[]>([]);
@@ -484,6 +516,7 @@ export class AppComponent implements OnInit {
       id: p.id, barcode: p.barcode, name: p.name, publisher: p.publisher,
       category: p.category, basePrice: p.base_price,
       discountOverride: p.discount_override ?? undefined,
+      coverUrl: this.productService.coverUrl(p.cover_path),
     })));
     const statsById = new Map(this.distributorService.stats().map(s => [s.distributor_id, s]));
     this.distributors.set(this.distributorService.distributors().map(d => {
@@ -874,6 +907,7 @@ export class AppComponent implements OnInit {
   openCreateProduct(): void {
     if (this.role() !== 'admin' && this.role() !== 'manager') return;
     this.editingProductId.set(null);
+    this.resetCoverPreview();
     this.creatingProduct.set(true);
     this.productError = '';
     this.editProdName = '';
@@ -885,12 +919,15 @@ export class AppComponent implements OnInit {
 
   closeProductModal(): void {
     if (this.productSaving()) return;
+    this.resetCoverPreview();
     this.editingProductId.set(null);
     this.creatingProduct.set(false);
     this.productError = '';
   }
 
   openEditProduct(product: Product): void {
+    if (!['admin', 'manager'].includes(this.role())) return;
+    this.resetCoverPreview(product.coverUrl);
     this.creatingProduct.set(false);
     this.productError = '';
     this.editingProductId.set(product.id);
@@ -933,7 +970,7 @@ export class AppComponent implements OnInit {
 
   async saveEditProduct(): Promise<void> {
     if (this.productSaving()) return;
-    if (this.role() !== 'admin' && !(this.role() === 'manager' && this.creatingProduct())) return;
+    if (this.role() !== 'admin' && this.role() !== 'manager') return;
     const id = this.editingProductId();
     const creating = this.creatingProduct();
     if (!creating && !id) return;
@@ -957,8 +994,13 @@ export class AppComponent implements OnInit {
     }
     this.productSaving.set(true);
     try {
-      const error = creating ? await this.productService.create(input) : await this.productService.update(id!, input);
+      const error = creating ? await this.productService.create(input)
+        : this.role() === 'admin' ? await this.productService.update(id!, input) : null;
       if (error) { this.productError = error; return; }
+      if (!creating && this.editCoverChanged) {
+        const coverError = await this.productService.saveCover(id!, this.editCoverFile);
+        if (coverError) { this.productError = coverError; return; }
+      }
       await this.reloadAll();
       if (creating) {
         this.selectedCategory.set('Барлығы');
@@ -967,6 +1009,7 @@ export class AppComponent implements OnInit {
       }
       this.editingProductId.set(null);
       this.creatingProduct.set(false);
+      this.resetCoverPreview();
     } catch {
       this.productError = 'Кітап сақталмады. Байланысты тексеріп, қайта көріңіз.';
     } finally {

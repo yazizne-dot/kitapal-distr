@@ -6,4 +6,5 @@ export interface Product {
   category: string;
   base_price: number;
   discount_override: number | null;
+  cover_path?: string | null;
 }

@@ -14,6 +14,7 @@ const text=readFileSync('src/app/app.component.ts','utf8');
 const methods=text.slice(text.indexOf('  openCreateProduct():'),text.indexOf('  monthLabel('));
 const Controller=new Function(compile(`class Controller {${methods}}`)+';return Controller;')();
 const c=new Controller();
+c.resetCoverPreview=()=>{};
 for(const [key,value] of Object.entries({editingProductId:null,creatingProduct:false,productSaving:false,selectedCategory:'Old',productQuery:'old',priceDisplayCount:8}))c[key]=signal(value);
 c.role=()=> 'admin'; c.products=()=>[];c.reloadAll=async()=>{};
 let creates=0;c.productService={create:async input=>{creates++;assert.equal(input.base_price,3000);return null;}};
