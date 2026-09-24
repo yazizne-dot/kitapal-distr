@@ -1,0 +1,52 @@
+[
+  {
+    "sheet": "Әділет кітаптары",
+    "row": 12,
+    "name": "Күйдірілген құран Египет 14/20",
+    "barcode": "NO-BARCODE-PRICE-20260923-12",
+    "price": 4400,
+    "discount": 0.15,
+    "publisher": "Әділет",
+    "category": "Кітаптар"
+  },
+  {
+    "sheet": "Әділет кітаптары",
+    "row": 23,
+    "name": "Құран замок 7/12 тәджуидпен",
+    "barcode": "NO-BARCODE-PRICE-20260923-23",
+    "price": 3450,
+    "discount": 0.15,
+    "publisher": "Әділет",
+    "category": "Кітаптар"
+  },
+  {
+    "sheet": "Әділет кітаптары",
+    "row": 127,
+    "name": "Путеводитель мусульманки 1 часть",
+    "barcode": "NO-BARCODE-PRICE-20260923-127",
+    "price": 6600,
+    "discount": 0.15,
+    "publisher": "Әділет",
+    "category": "Кітаптар"
+  },
+  {
+    "sheet": "Әділет кітаптары",
+    "row": 128,
+    "name": "Путеводитель мусульманки 2 часть",
+    "barcode": "NO-BARCODE-PRICE-20260923-128",
+    "price": 7150,
+    "discount": 0.15,
+    "publisher": "Әділет",
+    "category": "Кітаптар"
+  },
+  {
+    "sheet": "Әділет кітаптары",
+    "row": 130,
+    "name": "Рассказы о 4 халифах",
+    "barcode": "NO-BARCODE-PRICE-20260923-130",
+    "price": 6150,
+    "discount": 0.15,
+    "publisher": "Әділет",
+    "category": "Кітаптар"
+  }
+]
