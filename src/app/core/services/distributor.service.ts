@@ -30,14 +30,17 @@ export function missingTargetDistributorIds(distributorIds: number[], coveredIds
 export class DistributorService {
   readonly distributors = signal<Distributor[]>([]);
   readonly stats = signal<DistributorStats[]>([]);
+  readonly openingDebts = signal<Map<number, number>>(new Map());
 
   async load(): Promise<void> {
-    const [d, s] = await Promise.all([
+    const [d, s, opening] = await Promise.all([
       supabase.from('distributors').select('*').order('id'),
       supabase.from('distributor_stats').select('*').order('distributor_id'),
+      supabase.rpc('current_month_opening_debts'),
     ]);
     if (!d.error && d.data) this.distributors.set(d.data as Distributor[]);
     if (!s.error && s.data) this.stats.set(s.data as DistributorStats[]);
+    this.openingDebts.set(new Map((opening.error ? [] : opening.data ?? []).map((row: { distributor_id: number; amount: number }) => [row.distributor_id, Number(row.amount)])));
   }
 
   async setDiscount(id: number, discount: number): Promise<string | null> {

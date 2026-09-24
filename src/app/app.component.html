@@ -1204,7 +1204,7 @@
           <tr>
             <th>Дистрибьютор</th>
             <th>Қала</th>
-            <th>Бастапқы қарыз</th>
+            <th>Ай басындағы қарыз</th>
             <th>Төленді</th>
             <th>Нақты қарыз</th>
             <th>Лимит</th>
@@ -1216,7 +1216,7 @@
           <tr *ngFor="let item of visibleDistributors()">
             <td><strong>{{ item.company }}</strong></td>
             <td>{{ item.city }}</td>
-            <td class="muted">{{ (item.debt + (paymentsByDist().get(item.id) ?? 0)) | kzt }}</td>
+            <td class="muted">{{ item.openingDebt == null ? '—' : (item.openingDebt | kzt) }}</td>
             <td class="paid-cell">
               <span *ngIf="(paymentsByDist().get(item.id) ?? 0) > 0">
                 −{{ paymentsByDist().get(item.id) | kzt }}

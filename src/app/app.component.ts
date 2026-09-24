@@ -38,6 +38,7 @@ type Distributor = {
   discount: number;
   creditLimit: number;
   debt: number;
+  openingDebt?: number;
   phone: string;
 };
 
@@ -525,6 +526,7 @@ export class AppComponent implements OnInit {
         id: d.id, company: d.company, city: d.city, manager: '',
         target: s?.target ?? 0, achieved: s?.achieved ?? 0,
         discount: d.discount, creditLimit: d.credit_limit, debt: s?.debt ?? 0,
+        openingDebt: this.distributorService.openingDebts().get(d.id),
         phone: d.phone,
       };
     }));
