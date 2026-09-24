@@ -608,7 +608,6 @@
           <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('barcode')" (click)="toggleColumn('barcode')">Штрихкод</button>
           <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('publisher')" (click)="toggleColumn('publisher')">Баспасы</button>
           <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('basePrice')" (click)="toggleColumn('basePrice')">Негізгі баға</button>
-          <button type="button" class="col-chip" [class.col-chip-off]="!isColVisible('myPrice')" (click)="toggleColumn('myPrice')">Менің бағам</button>
           <button type="button" class="col-chip-reset" *ngIf="hiddenColumns().length > 0" (click)="hiddenColumns.set([])">Барлығын қайтару</button>
         </div>
 
@@ -619,7 +618,6 @@
               <th>Кітап атауы</th>
               <th *ngIf="isColVisible('publisher')">Баспасы</th>
               <th *ngIf="isColVisible('basePrice')">Негізгі баға</th>
-              <th *ngIf="isColVisible('myPrice')">Менің бағам (40%)</th>
               <th *ngIf="role() === 'admin' || role() === 'manager'"></th>
             </tr>
           </thead>
@@ -629,7 +627,6 @@
               <td><strong>{{ product.name }}</strong></td>
               <td *ngIf="isColVisible('publisher')">{{ product.publisher }}</td>
               <td *ngIf="isColVisible('basePrice')">{{ product.basePrice | kzt }}</td>
-              <td *ngIf="isColVisible('myPrice')"><strong class="my-price-cell">{{ myPrice(product) | kzt }}</strong></td>
               <td *ngIf="role() === 'admin' || role() === 'manager'">
                 <button type="button" class="btn-edit-sm" (click)="openEditProduct(product)">Өңдеу</button>
               </td>
