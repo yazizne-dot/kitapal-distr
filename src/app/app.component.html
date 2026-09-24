@@ -616,6 +616,7 @@
             <tr>
               <th *ngIf="isColVisible('barcode')">Штрихкод / ISBN</th>
               <th>Кітап атауы</th>
+              <th>Пачкадағы саны</th>
               <th *ngIf="isColVisible('publisher')">Баспасы</th>
               <th *ngIf="isColVisible('basePrice')">Негізгі баға</th>
               <th *ngIf="role() === 'admin' || role() === 'manager'"></th>
@@ -625,6 +626,7 @@
             <tr *ngFor="let product of adminDisplayedProducts()">
               <td *ngIf="isColVisible('barcode')"><small class="barcode-cell">{{ product.barcode }}</small></td>
               <td><strong>{{ product.name }}</strong></td>
+              <td>{{ product.packSize ?? '' }}</td>
               <td *ngIf="isColVisible('publisher')">{{ product.publisher }}</td>
               <td *ngIf="isColVisible('basePrice')">{{ product.basePrice | kzt }}</td>
               <td *ngIf="role() === 'admin' || role() === 'manager'">
@@ -686,6 +688,7 @@
                   <td>
                     <strong class="book-title-list">{{ product.name }}</strong>
                     <span class="book-meta-list">{{ product.publisher }} · {{ product.barcode }}</span>
+                    <small *ngIf="product.packSize != null">Пачкада {{ product.packSize }} дана</small>
                   </td>
                   <td class="price-cell-list">
                     <strong class="my-price-cell">{{ myPrice(product) | kzt }}</strong>
@@ -726,6 +729,7 @@
                   <span>Негізгі баға <b>{{ product.basePrice | kzt }}</b></span>
                   <span class="fixed-discount-label" *ngIf="product.discountOverride != null">Бекітілген жеңілдік: {{ product.discountOverride | percent:'1.0-1' }}</span>
                   <span class="my-price">Менің бағам <b>{{ myPrice(product) | kzt }}</b></span>
+                  <span *ngIf="product.packSize != null">Пачкада <b>{{ product.packSize }} дана</b></span>
                 </div>
                 <div class="qty-row">
                   <button type="button" (click)="changePriceQty(product.id, -1)">−</button>
@@ -1503,6 +1507,10 @@
         <label class="modal-field-label">
           Жеңілдіксіз негізгі баға (₸)
           <input type="number" min="0.01" step="0.01" class="modal-qty-input" [(ngModel)]="editProdBasePrice" [disabled]="productSaving() || (role() === 'manager' && !creatingProduct())">
+        </label>
+        <label class="modal-field-label">
+          Пачкадағы саны
+          <input type="number" min="1" step="1" class="modal-qty-input" [(ngModel)]="editProdPackSize" [disabled]="productSaving()" placeholder="Белгісіз болса, бос қалдырыңыз">
         </label>
         <div class="cover-editor" *ngIf="!creatingProduct()">
           <label class="modal-field-label">Кітап мұқабасы

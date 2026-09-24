@@ -7,4 +7,5 @@ export interface Product {
   base_price: number;
   discount_override: number | null;
   cover_path?: string | null;
+  pack_size?: number | null;
 }

@@ -7,6 +7,7 @@ export type Product = {
   basePrice: number;
   discountOverride?: number;
   coverUrl?: string;
+  packSize?: number | null;
 };
 
 export const products: Product[] = [

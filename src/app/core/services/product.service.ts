@@ -4,6 +4,10 @@ import { Product } from '../models/product';
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
+  async setPackSize(id: number, size: number | null): Promise<string | null> {
+    const { error } = await supabase.rpc('set_product_pack_size', { product_id: id, new_size: size });
+    return error ? 'Пачкадағы сан сақталмады. Қайта көріңіз.' : null;
+  }
   coverUrl(path?: string | null): string | undefined {
     return path ? supabase.storage.from('book-covers').getPublicUrl(path).data.publicUrl : undefined;
   }
@@ -43,7 +47,7 @@ export class ProductService {
     this.products.set(all);
   }
 
-  async create(input: Pick<Product, 'name' | 'barcode' | 'publisher' | 'category' | 'base_price'>): Promise<string | null> {
+  async create(input: Pick<Product, 'name' | 'barcode' | 'publisher' | 'category' | 'base_price'> & { pack_size?: number | null }): Promise<string | null> {
     const { error } = await supabase.from('products').insert({ ...input, discount_override: null });
     if (error) return error.code === '23505' ? 'Бұл штрихкодпен кітап бұрыннан бар.' : error.message;
     await this.load();

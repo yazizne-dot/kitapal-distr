@@ -388,6 +388,7 @@ export class AppComponent implements OnInit {
   editProdBarcode = '';
   editProdCategory = '';
   editProdBasePrice = 0;
+  editProdPackSize: number | null = null;
   editCoverFile: File | null = null;
   editCoverPreview = '';
   editCoverChanged = false;
@@ -518,6 +519,7 @@ export class AppComponent implements OnInit {
       category: p.category, basePrice: p.base_price,
       discountOverride: p.discount_override ?? undefined,
       coverUrl: this.productService.coverUrl(p.cover_path),
+      packSize: p.pack_size ?? null,
     })));
     const statsById = new Map(this.distributorService.stats().map(s => [s.distributor_id, s]));
     this.distributors.set(this.distributorService.distributors().map(d => {
@@ -917,6 +919,7 @@ export class AppComponent implements OnInit {
     this.editProdBarcode = '';
     this.editProdCategory = 'Кітаптар';
     this.editProdBasePrice = 0;
+    this.editProdPackSize = null;
   }
 
   closeProductModal(): void {
@@ -938,6 +941,7 @@ export class AppComponent implements OnInit {
     this.editProdBarcode = product.barcode;
     this.editProdCategory = product.category;
     this.editProdBasePrice = product.basePrice;
+    this.editProdPackSize = product.packSize ?? null;
   }
 
   async deleteEditedProduct(): Promise<void> {
@@ -980,8 +984,13 @@ export class AppComponent implements OnInit {
       name: this.editProdName.trim(), barcode: this.editProdBarcode.trim(),
       publisher: this.editProdPublisher.trim(), category: this.editProdCategory.trim(),
       base_price: Number(this.editProdBasePrice),
+      pack_size: this.editProdPackSize == null ? null : Number(this.editProdPackSize),
     };
     this.productError = '';
+    if (input.pack_size !== null && (!Number.isInteger(input.pack_size) || input.pack_size <= 0 || input.pack_size > 2147483647)) {
+      this.productError = 'Пачкадағы сан оң бүтін сан болуы керек. Белгісіз болса, бос қалдырыңыз.';
+      return;
+    }
     if (!input.name || !input.barcode || !input.publisher) {
       this.productError = 'Кітап атауын, штрихкодын және баспасын толтырыңыз.';
       return;
@@ -997,7 +1006,7 @@ export class AppComponent implements OnInit {
     this.productSaving.set(true);
     try {
       const error = creating ? await this.productService.create(input)
-        : this.role() === 'admin' ? await this.productService.update(id!, input) : null;
+        : this.role() === 'admin' ? await this.productService.update(id!, input) : await this.productService.setPackSize(id!, input.pack_size);
       if (error) { this.productError = error; return; }
       if (!creating && this.editCoverChanged) {
         const coverError = await this.productService.saveCover(id!, this.editCoverFile);
