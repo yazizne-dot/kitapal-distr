@@ -580,7 +580,6 @@ export class AppComponent implements OnInit {
   ];
 
   managerMenu = [
-    ['analytics', 'Аналитика'],
     ['overview', 'Басқы бет'],
     ['distributors', 'Дистрибьюторлар'],
     ['orders', 'Тапсырыстар'],
@@ -1315,6 +1314,7 @@ export class AppComponent implements OnInit {
   }
 
   navigate(screen: string): void {
+    if (screen === 'analytics' && this.role() !== 'admin') return;
     if (screen === 'orders' && this.role() !== 'distributor') {
       this.setOrderDistributorFilter(0);
     }
