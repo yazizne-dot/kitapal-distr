@@ -13,6 +13,7 @@ import { PaymentService } from './core/services/payment.service';
 import { MessageService } from './core/services/message.service';
 import { NotificationService } from './core/services/notification.service';
 import { AccountService } from './core/services/account.service';
+import { AnalyticsComponent } from './analytics/analytics.component';
 
 type Role = 'admin' | 'manager' | 'distributor';
 type OrderStatus = 'draft' | 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
@@ -317,7 +318,7 @@ const orders: Order[] = [
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, KztPipe, DatePipe, PercentPipe],
+  imports: [CommonModule, FormsModule, KztPipe, DatePipe, PercentPipe, AnalyticsComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
@@ -559,6 +560,7 @@ export class AppComponent implements OnInit {
   }
 
   adminMenu = [
+    ['analytics', 'Аналитика'],
     ['overview', 'Басқы бет'],
     ['goals', 'Мақсаттар'],
     ['distributors', 'Дистрибьюторлар'],
@@ -578,6 +580,7 @@ export class AppComponent implements OnInit {
   ];
 
   managerMenu = [
+    ['analytics', 'Аналитика'],
     ['overview', 'Басқы бет'],
     ['distributors', 'Дистрибьюторлар'],
     ['orders', 'Тапсырыстар'],

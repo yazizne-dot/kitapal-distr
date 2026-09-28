@@ -87,6 +87,7 @@
     </header>
 
     <!-- ══ OVERVIEW ══ -->
+    <app-analytics *ngIf="activeScreen() === 'analytics' && (role() === 'admin' || role() === 'manager')"></app-analytics>
     <section class="screen" *ngIf="activeScreen() === 'overview'">
       <div class="stats-grid">
         <article>
