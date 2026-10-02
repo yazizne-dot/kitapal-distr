@@ -1009,11 +1009,16 @@
                     </td>
                     <td>{{ item.publisher }}</td>
                     <td>{{ item.discount | percent }}</td>
-                    <td>{{ item.unitPrice | kzt }}</td>
+                    <td>
+                      <input *ngIf="canEditOrderPrice(selectedOrder()!)" type="number" class="qty-edit-input" min="0" step="0.01"
+                        aria-label="Кітап бағасы" [ngModel]="item.unitPrice"
+                        (change)="updateOrderItemPrice(selectedOrder()!.id, item.productId, $any($event.target).valueAsNumber)">
+                      <span *ngIf="!canEditOrderPrice(selectedOrder()!)">{{ item.unitPrice | kzt }}</span>
+                    </td>
                     <td>
                       <input *ngIf="canEditOrder(selectedOrder()!)" type="number" class="qty-edit-input" min="1"
                         [ngModel]="item.qty"
-                        (ngModelChange)="updateOrderItemQty(selectedOrder()!.id, item.productId, +$event)">
+                        (change)="updateOrderItemQty(selectedOrder()!.id, item.productId, $any($event.target).valueAsNumber)">
                       <span *ngIf="!canEditOrder(selectedOrder()!)">{{ item.qty }}</span>
                     </td>
                     <td><strong>{{ item.amount | kzt }}</strong></td>

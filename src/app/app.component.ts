@@ -109,7 +109,7 @@ const distributors: Distributor[] = [
   { id: 7,  company: 'Байгелов',         city: 'Тараз',     manager: 'Маржан', target: 9000000,  achieved: 702806,   discount: 0.37, creditLimit: 2000000,  debt: 2455954,  phone: '' },
   { id: 8,  company: 'ЖасКО',            city: 'Тараз',     manager: 'Маржан', target: 10000000, achieved: 759006,   discount: 0.40, creditLimit: 2000000,  debt: 2083129,  phone: '' },
   { id: 9,  company: 'Олжабаев',         city: 'Шымкент',   manager: 'Маржан', target: 42000000, achieved: 1668679,  discount: 0.45, creditLimit: 15000000, debt: 1668679,  phone: '' },
-  { id: 10, company: 'Сабитова Нұртас',  city: 'Алматы',    manager: 'Маржан', target: 40000000, achieved: 2831901,  discount: 0.45, creditLimit: 8000000,  debt: 2831901,  phone: '' },
+  { id: 10, company: 'Нұртас',  city: 'Алматы',    manager: 'Маржан', target: 40000000, achieved: 2831901,  discount: 0.45, creditLimit: 8000000,  debt: 2831901,  phone: '' },
   { id: 11, company: 'Рахманов',         city: 'Барахолка', manager: 'Маржан', target: 25000000, achieved: 2307519,  discount: 0.45, creditLimit: 10000000, debt: 7065200,  phone: '' },
 ];
 
@@ -1478,7 +1478,11 @@ export class AppComponent implements OnInit {
     if (this.role() === 'distributor') {
       return order.distributorId === this.selectedDistributorId() && ['pending', 'draft'].includes(order.status);
     }
-    return (this.role() === 'admin' || this.role() === 'manager') && ['pending', 'draft', 'confirmed'].includes(order.status);
+    return (this.role() === 'admin' || this.role() === 'manager') && ['pending', 'draft', 'confirmed', 'shipped'].includes(order.status);
+  }
+
+  canEditOrderPrice(order: Order): boolean {
+    return (this.role() === 'admin' || this.role() === 'manager') && this.canEditOrder(order);
   }
 
   canAddItem(order: Order): boolean {
@@ -1519,18 +1523,33 @@ export class AppComponent implements OnInit {
 
   async removeOrderItem(orderId: string, productId: number): Promise<void> {
     const order = this.orders().find(o => o.id === orderId);
+    if (!order || !this.canEditOrder(order)) return;
     const item = order?.items.find(i => i.productId === productId);
     if (!item?.id) return;
     const err = await this.orderService.removeItem(item.id);
-    if (err) { console.error('removeOrderItem:', err); return; }
+    if (err) { alert('Кітап өшірілмеді: ' + err); return; }
     await this.reloadAll();
   }
 
   async updateOrderItemQty(orderId: string, productId: number, newQty: number): Promise<void> {
     const order = this.orders().find(o => o.id === orderId);
+    if (!order || !this.canEditOrder(order) || !Number.isFinite(newQty)) return;
     const item = order?.items.find(i => i.productId === productId);
     if (!item?.id) return;
-    await this.orderService.updateItemQty(item.id, Math.max(1, Math.round(newQty) || 1));
+    const err = await this.orderService.updateItemQty(item.id, Math.max(1, Math.round(newQty) || 1));
+    if (err) { alert('Саны сақталмады: ' + err); return; }
+    await this.reloadAll();
+  }
+
+  async updateOrderItemPrice(orderId: string, productId: number, newPrice: number): Promise<void> {
+    const order = this.orders().find(o => o.id === orderId);
+    if (!order || !this.canEditOrderPrice(order) || !Number.isFinite(newPrice) || newPrice < 0) return;
+    const item = order.items.find(i => i.productId === productId);
+    if (!item?.id) return;
+    const price = Math.round(newPrice * 100) / 100;
+    if (price === item.unitPrice) return;
+    const err = await this.orderService.updateItemPrice(item.id, price);
+    if (err) { alert('Баға сақталмады: ' + err); return; }
     await this.reloadAll();
   }
 

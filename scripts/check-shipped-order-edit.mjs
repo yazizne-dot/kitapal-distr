@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+
+// Run the component's real permission methods without bootstrapping Angular.
+const source = ts.createSourceFile('component.ts', readFileSync(new URL('../src/app/app.component.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true);
+const component = source.statements.find(n => ts.isClassDeclaration(n) && n.name.text === 'AppComponent');
+const names = ['canEditOrder', 'canEditOrderPrice'];
+const methods = component.members.filter(n => names.includes(n.name?.getText(source))).map(n => n.getText(source)).join('\n');
+const js = ts.transpileModule(`export class Permissions { ${methods} }`, { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
+const { Permissions } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
+const permissions = new Permissions();
+let role = 'manager';
+permissions.role = () => role;
+permissions.selectedDistributorId = () => 10;
+const order = { distributorId: 10, status: 'shipped' };
+assert.equal(permissions.canEditOrder(order), true, 'manager can edit shipped orders');
+assert.equal(permissions.canEditOrderPrice(order), true, 'manager can change shipped order prices');
+role = 'admin';
+assert.equal(permissions.canEditOrder(order), true);
+assert.equal(permissions.canEditOrderPrice(order), true);
+role = 'distributor';
+assert.equal(permissions.canEditOrder(order), false);
+assert.equal(permissions.canEditOrderPrice(order), false);
+assert.equal(permissions.canEditOrder({ ...order, status: 'pending' }), true);
+assert.equal(permissions.canEditOrderPrice({ ...order, status: 'pending' }), false);
+assert.equal(permissions.canEditOrder({ ...order, distributorId: 11, status: 'pending' }), false);
+role = 'manager';
+assert.equal(permissions.canEditOrder({ ...order, status: 'delivered' }), false);
+assert.equal(permissions.canEditOrderPrice({ ...order, status: 'cancelled' }), false);
+console.log('Shipped order permissions: 11 assertions passed');

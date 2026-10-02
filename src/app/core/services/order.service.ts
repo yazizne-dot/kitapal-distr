@@ -92,6 +92,15 @@ export class OrderService {
     return null;
   }
 
+  async updateItemPrice(itemId: number, unitPrice: number): Promise<string | null> {
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) return 'Баға нөлден кем болмауы керек';
+    const { error } = await supabase.from('order_items')
+      .update({ unit_price: Math.round(unitPrice * 100) / 100 }).eq('id', itemId);
+    if (error) return error.message;
+    await this.load();
+    return null;
+  }
+
   async hardDelete(orderId: string): Promise<string | null> {
     const { error } = await supabase.from('orders').delete().eq('id', orderId);
     if (error) return error.message;
