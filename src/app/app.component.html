@@ -997,7 +997,7 @@
                     <th>Бағам</th>
                     <th>Саны</th>
                     <th>Жол сомасы</th>
-                    <th *ngIf="canEditOrder(selectedOrder()!)"></th>
+                    <th *ngIf="isOrderItemEditable(selectedOrder()!)"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1009,15 +1009,20 @@
                     </td>
                     <td>{{ item.publisher }}</td>
                     <td>{{ item.discount | percent }}</td>
-                    <td>{{ item.unitPrice | kzt }}</td>
                     <td>
-                      <input *ngIf="canEditOrder(selectedOrder()!)" type="number" class="qty-edit-input" min="1"
+                      <input *ngIf="canEditOrderPrice(selectedOrder()!) && isOrderItemEditable(selectedOrder()!)" type="number" class="qty-edit-input" min="0" step="0.01"
+                        aria-label="Кітап бағасы" [ngModel]="item.unitPrice"
+                        (change)="updateOrderItemPrice(selectedOrder()!.id, item.productId, $any($event.target).valueAsNumber)">
+                      <span *ngIf="!(canEditOrderPrice(selectedOrder()!) && isOrderItemEditable(selectedOrder()!))">{{ item.unitPrice | kzt }}</span>
+                    </td>
+                    <td>
+                      <input *ngIf="isOrderItemEditable(selectedOrder()!)" type="number" class="qty-edit-input" min="1"
                         [ngModel]="item.qty"
-                        (ngModelChange)="updateOrderItemQty(selectedOrder()!.id, item.productId, +$event)">
-                      <span *ngIf="!canEditOrder(selectedOrder()!)">{{ item.qty }}</span>
+                        (change)="updateOrderItemQty(selectedOrder()!.id, item.productId, $any($event.target).valueAsNumber)">
+                      <span *ngIf="!isOrderItemEditable(selectedOrder()!)">{{ item.qty }}</span>
                     </td>
                     <td><strong>{{ item.amount | kzt }}</strong></td>
-                    <td *ngIf="canEditOrder(selectedOrder()!)">
+                    <td *ngIf="isOrderItemEditable(selectedOrder()!)">
                       <button type="button" class="rm-btn" (click)="removeOrderItem(selectedOrder()!.id, item.productId)">×</button>
                     </td>
                   </tr>
@@ -1049,7 +1054,15 @@
             </div>
           </div>
 
-          <div class="order-actions" *ngIf="role() === 'manager' || role() === 'admin'">
+          <div class="order-actions" *ngIf="selectedOrder()!.status === 'shipped' && canEditOrderPrice(selectedOrder()!)">
+            <button type="button" class="btn-confirm" *ngIf="!orderEditDraft()" (click)="startOrderEdit()">Тапсырысты өзгерту</button>
+            <ng-container *ngIf="orderEditDraft()">
+              <button type="button" class="btn-confirm" [disabled]="orderEditSaving()" (click)="saveOrderEdit()">{{ orderEditSaving() ? 'Сақталуда…' : 'Сақтау' }}</button>
+              <button type="button" class="btn-ghost" [disabled]="orderEditSaving()" (click)="cancelOrderEdit()">Бас тарту</button>
+            </ng-container>
+          </div>
+          <p *ngIf="orderEditError()" role="alert" style="color:#bf3434">{{ orderEditError() }}</p>
+          <div class="order-actions" *ngIf="!orderEditDraft() && (role() === 'manager' || role() === 'admin')">
             <!-- Draft (лимит асты) — менеджер қолмен растай алады -->
             <button type="button" class="btn-confirm btn-override"
               *ngIf="selectedOrder()!.status === 'draft'"
@@ -1094,7 +1107,7 @@
 
           <!-- Бұрын жөнелтілген тапсырыстың накладнойын қайта шығару -->
           <div class="order-actions"
-            *ngIf="selectedOrder()!.status === 'shipped' || selectedOrder()!.status === 'delivered'">
+            *ngIf="!orderEditDraft() && (selectedOrder()!.status === 'shipped' || selectedOrder()!.status === 'delivered')">
             <button type="button" class="btn-ship-nakladnoy"
               (click)="generateNakladnoy(selectedOrder()!)">
               📄 Накладнаны қайта шығару
@@ -1510,6 +1523,12 @@
           <input type="number" min="0.01" step="0.01" class="modal-qty-input" [(ngModel)]="editProdBasePrice" [disabled]="productSaving() || (role() === 'manager' && !creatingProduct())">
         </label>
         <label class="modal-field-label">
+          Кітаптың жеңілдігі (%)
+          <input type="number" min="0" max="100" step="0.1" class="modal-qty-input" [(ngModel)]="editProdDiscountPercent"
+            [disabled]="productSaving() || (role() === 'manager' && !creatingProduct())"
+            placeholder="Бос болса, дистрибьютор жеңілдігі қолданылады">
+        </label>
+        <label class="modal-field-label">
           Пачкадағы саны
           <input type="number" min="1" step="1" class="modal-qty-input" [(ngModel)]="editProdPackSize" [disabled]="productSaving()" placeholder="Белгісіз болса, бос қалдырыңыз">
         </label>
@@ -1522,7 +1541,7 @@
           <button type="button" class="btn-ghost" *ngIf="editCoverPreview" [disabled]="productSaving()" (click)="removeProductCover()">Суретті алып тастау</button>
         </div>
         <p *ngIf="creatingProduct()">Кітапты сақтағаннан кейін «Өңдеу» арқылы мұқабасын жүктей аласыз.</p>
-        <p *ngIf="creatingProduct()">Әр дистрибьютордың өз жеңілдігі автоматты қолданылады.</p>
+        <p *ngIf="creatingProduct()">Кітаптың жеңілдігі көрсетілсе, сол пайыз қолданылады. Бос болса, дистрибьютор жеңілдігі қолданылады.</p>
         <p *ngIf="productError" role="alert" style="color:#c0392b">{{ productError }}</p>
         <div class="modal-actions">
           <button type="button" class="btn-ghost btn-danger-ghost"

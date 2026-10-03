@@ -109,7 +109,7 @@ const distributors: Distributor[] = [
   { id: 7,  company: 'Байгелов',         city: 'Тараз',     manager: 'Маржан', target: 9000000,  achieved: 702806,   discount: 0.37, creditLimit: 2000000,  debt: 2455954,  phone: '' },
   { id: 8,  company: 'ЖасКО',            city: 'Тараз',     manager: 'Маржан', target: 10000000, achieved: 759006,   discount: 0.40, creditLimit: 2000000,  debt: 2083129,  phone: '' },
   { id: 9,  company: 'Олжабаев',         city: 'Шымкент',   manager: 'Маржан', target: 42000000, achieved: 1668679,  discount: 0.45, creditLimit: 15000000, debt: 1668679,  phone: '' },
-  { id: 10, company: 'Сабитова Нұртас',  city: 'Алматы',    manager: 'Маржан', target: 40000000, achieved: 2831901,  discount: 0.45, creditLimit: 8000000,  debt: 2831901,  phone: '' },
+  { id: 10, company: 'Нұртас',  city: 'Алматы',    manager: 'Маржан', target: 40000000, achieved: 2831901,  discount: 0.45, creditLimit: 8000000,  debt: 2831901,  phone: '' },
   { id: 11, company: 'Рахманов',         city: 'Барахолка', manager: 'Маржан', target: 25000000, achieved: 2307519,  discount: 0.45, creditLimit: 10000000, debt: 7065200,  phone: '' },
 ];
 
@@ -345,6 +345,9 @@ export class AppComponent implements OnInit {
   addItemModal = signal(false);
   addItemQuery = signal('');
   shipModal = signal(false);
+  orderEditDraft = signal<Order | null>(null);
+  orderEditSaving = signal(false);
+  orderEditError = signal('');
   showLoginPassword = signal(false);
   mobileMenuOpen = signal(false);
 
@@ -390,6 +393,7 @@ export class AppComponent implements OnInit {
   editProdCategory = '';
   editProdBasePrice = 0;
   editProdPackSize: number | null = null;
+  editProdDiscountPercent: number | null = null;
   editCoverFile: File | null = null;
   editCoverPreview = '';
   editCoverChanged = false;
@@ -639,7 +643,8 @@ export class AppComponent implements OnInit {
   );
 
   selectedOrder = computed<Order | null>(() =>
-    this.visibleOrders().find((order) => order.id === this.selectedOrderId()) ?? null
+    this.orderEditDraft()?.id === this.selectedOrderId() ? this.orderEditDraft() :
+      this.visibleOrders().find((order) => order.id === this.selectedOrderId()) ?? null
   );
 
   // Orders sorted: pending & draft first, then confirmed, shipped, delivered last
@@ -922,6 +927,7 @@ export class AppComponent implements OnInit {
     this.editProdCategory = 'Кітаптар';
     this.editProdBasePrice = 0;
     this.editProdPackSize = null;
+    this.editProdDiscountPercent = null;
   }
 
   closeProductModal(): void {
@@ -944,6 +950,7 @@ export class AppComponent implements OnInit {
     this.editProdCategory = product.category;
     this.editProdBasePrice = product.basePrice;
     this.editProdPackSize = product.packSize ?? null;
+    this.editProdDiscountPercent = product.discountOverride == null ? null : Math.round(product.discountOverride * 10000) / 100;
   }
 
   async deleteEditedProduct(): Promise<void> {
@@ -987,8 +994,13 @@ export class AppComponent implements OnInit {
       publisher: this.editProdPublisher.trim(), category: this.editProdCategory.trim(),
       base_price: Number(this.editProdBasePrice),
       pack_size: this.editProdPackSize == null ? null : Number(this.editProdPackSize),
+      discount_override: this.editProdDiscountPercent == null ? null : Number(this.editProdDiscountPercent) / 100,
     };
     this.productError = '';
+    if (input.discount_override !== null && (!Number.isFinite(input.discount_override) || input.discount_override < 0 || input.discount_override > 1)) {
+      this.productError = 'Жеңілдік 0–100% аралығында болуы керек.';
+      return;
+    }
     if (input.pack_size !== null && (!Number.isInteger(input.pack_size) || input.pack_size <= 0 || input.pack_size > 2147483647)) {
       this.productError = 'Пачкадағы сан оң бүтін сан болуы керек. Белгісіз болса, бос қалдырыңыз.';
       return;
@@ -1409,6 +1421,8 @@ export class AppComponent implements OnInit {
   }
 
   openOrder(orderId: string): void {
+    if (this.orderEditSaving()) return;
+    this.cancelOrderEdit();
     this.selectedOrderId.set(orderId);
   }
 
@@ -1478,14 +1492,63 @@ export class AppComponent implements OnInit {
     if (this.role() === 'distributor') {
       return order.distributorId === this.selectedDistributorId() && ['pending', 'draft'].includes(order.status);
     }
-    return (this.role() === 'admin' || this.role() === 'manager') && ['pending', 'draft', 'confirmed'].includes(order.status);
+    return (this.role() === 'admin' || this.role() === 'manager') && ['pending', 'draft', 'confirmed', 'shipped'].includes(order.status);
+  }
+
+  canEditOrderPrice(order: Order): boolean {
+    return (this.role() === 'admin' || this.role() === 'manager') && this.canEditOrder(order);
+  }
+
+  isOrderItemEditable(order: Order): boolean {
+    return this.canEditOrder(order) && !this.orderEditSaving() &&
+      (order.status !== 'shipped' || this.orderEditDraft()?.id === order.id);
+  }
+
+  startOrderEdit(): void {
+    const order = this.selectedOrder();
+    if (!order || order.status !== 'shipped' || !this.canEditOrder(order) || this.orderEditSaving()) return;
+    this.orderEditError.set('');
+    this.orderEditDraft.set({ ...order, items: order.items.map(item => ({ ...item })) });
+  }
+
+  cancelOrderEdit(): void {
+    if (this.orderEditSaving()) return;
+    this.orderEditDraft.set(null);
+    this.orderEditError.set('');
+    this.addItemModal.set(false);
+  }
+
+  setOrderDraftItems(items: OrderItem[]): void {
+    const draft = this.orderEditDraft();
+    if (!draft || this.orderEditSaving()) return;
+    const updated = items.map(item => ({ ...item, amount: Math.round(item.qty * item.unitPrice * 100) / 100 }));
+    this.orderEditDraft.set({ ...draft, items: updated, amount: updated.reduce((sum, item) => sum + item.amount, 0) });
+  }
+
+  async saveOrderEdit(): Promise<void> {
+    const draft = this.orderEditDraft();
+    if (!draft?.uuid || this.orderEditSaving() || !this.canEditOrderPrice(draft)) return;
+    if (!draft.items.length) { this.orderEditError.set('Кемінде бір кітап қалуы керек'); return; }
+    this.orderEditSaving.set(true);
+    this.orderEditError.set('');
+    try {
+      const error = await this.orderService.saveShippedItems(draft.uuid, draft.items);
+      if (error) { this.orderEditError.set('Өзгерістер сақталмады: ' + error); return; }
+      this.orderEditDraft.set(null);
+      await this.reloadAll();
+    } catch {
+      this.orderEditError.set('Сақтау кезінде қате болды. Қайта көріңіз.');
+    } finally {
+      this.orderEditSaving.set(false);
+    }
   }
 
   canAddItem(order: Order): boolean {
     if (this.role() === 'distributor') {
       return order.distributorId === this.selectedDistributorId() && ['pending', 'draft'].includes(order.status);
     }
-    return (this.role() === 'admin' || this.role() === 'manager') && ['pending', 'draft'].includes(order.status);
+    return (this.role() === 'admin' || this.role() === 'manager') &&
+      (['pending', 'draft'].includes(order.status) || (order.status === 'shipped' && this.isOrderItemEditable(order)));
   }
 
   canDistributorCancel(order: Order): boolean {
@@ -1518,25 +1581,55 @@ export class AppComponent implements OnInit {
   }
 
   async removeOrderItem(orderId: string, productId: number): Promise<void> {
-    const order = this.orders().find(o => o.id === orderId);
+    const order = this.orderEditDraft()?.id === orderId ? this.orderEditDraft() : this.orders().find(o => o.id === orderId);
+    if (!order || !this.canEditOrder(order)) return;
     const item = order?.items.find(i => i.productId === productId);
-    if (!item?.id) return;
+    if (!item) return;
+    if (order.status === 'shipped') {
+      if (this.isOrderItemEditable(order)) this.setOrderDraftItems(this.orderEditDraft()!.items.filter(i => i.productId !== productId));
+      return;
+    }
+    if (!item.id) return;
     const err = await this.orderService.removeItem(item.id);
-    if (err) { console.error('removeOrderItem:', err); return; }
+    if (err) { alert('Кітап өшірілмеді: ' + err); return; }
     await this.reloadAll();
   }
 
   async updateOrderItemQty(orderId: string, productId: number, newQty: number): Promise<void> {
-    const order = this.orders().find(o => o.id === orderId);
+    const order = this.orderEditDraft()?.id === orderId ? this.orderEditDraft() : this.orders().find(o => o.id === orderId);
+    if (!order || !this.canEditOrder(order) || !Number.isFinite(newQty)) return;
     const item = order?.items.find(i => i.productId === productId);
-    if (!item?.id) return;
-    await this.orderService.updateItemQty(item.id, Math.max(1, Math.round(newQty) || 1));
+    if (!item) return;
+    if (order.status === 'shipped') {
+      if (this.isOrderItemEditable(order)) this.setOrderDraftItems(this.orderEditDraft()!.items.map(i => i.productId === productId ? { ...i, qty: Math.max(1, Math.round(newQty)) } : i));
+      return;
+    }
+    if (!item.id) return;
+    const err = await this.orderService.updateItemQty(item.id, Math.max(1, Math.round(newQty) || 1));
+    if (err) { alert('Саны сақталмады: ' + err); return; }
+    await this.reloadAll();
+  }
+
+  async updateOrderItemPrice(orderId: string, productId: number, newPrice: number): Promise<void> {
+    const order = this.orderEditDraft()?.id === orderId ? this.orderEditDraft() : this.orders().find(o => o.id === orderId);
+    if (!order || !this.canEditOrderPrice(order) || !Number.isFinite(newPrice) || newPrice < 0) return;
+    const item = order.items.find(i => i.productId === productId);
+    if (!item) return;
+    const price = Math.round(newPrice * 100) / 100;
+    if (order.status === 'shipped') {
+      if (this.isOrderItemEditable(order)) this.setOrderDraftItems(this.orderEditDraft()!.items.map(i => i.productId === productId ? { ...i, unitPrice: price } : i));
+      return;
+    }
+    if (price === item.unitPrice) return;
+    if (!item.id) return;
+    const err = await this.orderService.updateItemPrice(item.id, price);
+    if (err) { alert('Баға сақталмады: ' + err); return; }
     await this.reloadAll();
   }
 
   async confirmAddItem(): Promise<void> {
     const order = this.selectedOrder();
-    if (!order?.uuid) return;
+    if (!order?.uuid || !this.canAddItem(order) || this.orderEditSaving()) return;
     const product = this.products().find(p => p.id === Number(this.addItemProductId));
     if (!product) return;
     // Close immediately so repeated clicks can't fire a second request
@@ -1547,6 +1640,12 @@ export class AppComponent implements OnInit {
     const unitPrice = Math.round(product.basePrice * (1 - discount));
     const qty = Math.max(1, Number(this.addItemQty) || 1);
     const existing = order.items.find(i => i.productId === product.id);
+    if (order.status === 'shipped') {
+      const items = existing ? order.items.map(i => i.productId === product.id ? { ...i, qty: i.qty + qty } : i) :
+        [...order.items, { productId: product.id, name: product.name, barcode: product.barcode, publisher: product.publisher, qty, unitPrice, discount, amount: qty * unitPrice }];
+      this.setOrderDraftItems(items);
+      return;
+    }
     if (existing?.id) {
       await this.orderService.updateItemQty(existing.id, existing.qty + qty);
     } else {

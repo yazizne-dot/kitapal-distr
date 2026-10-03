@@ -47,8 +47,8 @@ export class ProductService {
     this.products.set(all);
   }
 
-  async create(input: Pick<Product, 'name' | 'barcode' | 'publisher' | 'category' | 'base_price'> & { pack_size?: number | null }): Promise<string | null> {
-    const { error } = await supabase.from('products').insert({ ...input, discount_override: null });
+  async create(input: Pick<Product, 'name' | 'barcode' | 'publisher' | 'category' | 'base_price'> & { pack_size?: number | null; discount_override?: number | null }): Promise<string | null> {
+    const { error } = await supabase.from('products').insert({ ...input, discount_override: input.discount_override ?? null });
     if (error) return error.code === '23505' ? 'Бұл штрихкодпен кітап бұрыннан бар.' : error.message;
     await this.load();
     return null;

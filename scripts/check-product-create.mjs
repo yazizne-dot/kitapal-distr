@@ -9,6 +9,10 @@ new Function('require','exports',compile(readFileSync('src/app/core/services/pro
 const service=new serviceExports.ProductService();service.load=async()=>{};
 assert.equal(await service.create({name:'Book',barcode:'001234',publisher:'Publisher',category:'Books',base_price:3000}),null);
 assert.equal(inserted.discount_override,null);assert.equal(inserted.barcode,'001234');
+await service.create({name:'Book',barcode:'002',publisher:'Publisher',category:'Books',base_price:3000,discount_override:.45});
+assert.equal(inserted.discount_override,.45,'custom book discount is preserved');
+await service.create({name:'Book',barcode:'003',publisher:'Publisher',category:'Books',base_price:3000,discount_override:0});
+assert.equal(inserted.discount_override,0,'zero discount is preserved');
 serverError={code:'23505'};assert.match(await service.create({}),/штрихкод/);
 const text=readFileSync('src/app/app.component.ts','utf8');
 const methods=text.slice(text.indexOf('  openCreateProduct():'),text.indexOf('  monthLabel('));
@@ -32,3 +36,17 @@ c.editProdName='Manager book';c.editProdBarcode='002';c.editProdPublisher='Publi
 await c.saveEditProduct();assert.equal(creates,2);
 c.editingProductId.set(5);await c.saveEditProduct();assert.equal(creates,2);
 console.log('Product creation: validation, duplicate barcode, admin/manager creation, distributor denial and inherited discount passed');
+
+c.products=()=>[];c.role=()=> 'manager';
+let lastDiscount='unset';
+c.productService.create=async input=>{lastDiscount=input.discount_override;return null;};
+for(const [percent,expected] of [[45,.45],[0,0],[null,null],[100,1]]) {
+ c.openCreateProduct();c.editProdName='Discount book';c.editProdBarcode='009';c.editProdPublisher='Publisher';c.editProdBasePrice=3000;c.editProdDiscountPercent=percent;
+ await c.saveEditProduct();assert.equal(lastDiscount,expected);
+}
+c.openCreateProduct();c.editProdName='Bad discount';c.editProdBarcode='010';c.editProdPublisher='Publisher';c.editProdBasePrice=3000;
+for(const percent of [-1,101,NaN]) {
+ c.editProdDiscountPercent=percent;lastDiscount='unset';await c.saveEditProduct();
+ assert.equal(lastDiscount,'unset');assert.match(c.productError,/0–100/);
+}
+console.log('Custom book discounts: percentage conversion, zero, inheritance and bounds passed');
