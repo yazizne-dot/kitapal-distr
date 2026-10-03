@@ -564,7 +564,6 @@ export class AppComponent implements OnInit {
   }
 
   adminMenu = [
-    ['analytics', 'Аналитика'],
     ['overview', 'Басқы бет'],
     ['goals', 'Мақсаттар'],
     ['distributors', 'Дистрибьюторлар'],
@@ -572,6 +571,7 @@ export class AppComponent implements OnInit {
     ['orders', 'Тапсырыстар'],
     ['debts', 'Қарыз және лимит'],
     ['users', 'Пайдаланушылар'],
+    ['analytics', 'Аналитика'],
     ['notifications', 'Хабарламалар']
   ];
 
