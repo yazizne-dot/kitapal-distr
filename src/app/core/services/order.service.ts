@@ -85,6 +85,14 @@ export class OrderService {
     return null;
   }
 
+  async saveShippedItems(orderId: string, items: { productId: number; qty: number; unitPrice: number; discount: number }[]): Promise<string | null> {
+    const { error } = await supabase.rpc('save_shipped_order_items', {
+      p_order_id: orderId,
+      p_items: items.map(item => ({ product_id: item.productId, qty: item.qty, unit_price: item.unitPrice, discount: item.discount })),
+    });
+    return error?.message ?? null;
+  }
+
   async removeItem(itemId: number): Promise<string | null> {
     const { error } = await supabase.from('order_items').delete().eq('id', itemId);
     if (error) return error.message;
