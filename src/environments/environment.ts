@@ -1,7 +1,7 @@
 export const environment = {
   production: true,
-  supabaseUrl: 'https://tgiwtfavkuphllpgtuck.supabase.co',
+  supabaseUrl: 'https://bfssfdstlobqsedizhiv.supabase.co',
   // anon (publishable) key — safe to ship in a client app; RLS protects the data.
   supabaseAnonKey:
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnaXd0ZmF2a3VwaGxscGd0dWNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5Mjk1NjYsImV4cCI6MjA5NzUwNTU2Nn0.3WSAhP_MFC6swnoK0d_ivUKEegcLpKVKffpKmAA0V7s',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJmc3NmZHN0bG9icXNlZGl6aGl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMTY4MzMsImV4cCI6MjEwNjU5MjgzM30.xotpEslcbEBHeox0rTQCQRRPVElZpCNiiRCAWl7hSSA',
 };
