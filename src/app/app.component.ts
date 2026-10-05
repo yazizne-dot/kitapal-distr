@@ -55,6 +55,7 @@ type Order = {
 };
 
 type OrderItem = {
+  discountBasePrice?: number;
   id?: number; // order_items.id — used for item edit/remove service calls
   productId: number;
   name: string;
@@ -1610,6 +1611,19 @@ export class AppComponent implements OnInit {
     await this.reloadAll();
   }
 
+  updateOrderItemDiscount(orderId: string, productId: number, percent: number): void {
+    const draft = this.orderEditDraft();
+    if (!draft || draft.id !== orderId || !this.canEditOrderPrice(draft) ||
+        !this.isOrderItemEditable(draft) || !Number.isFinite(percent) || percent < 0 || percent > 100) return;
+    const item = draft.items.find(i => i.productId === productId);
+    if (!item) return;
+    const discount = Math.round(percent * 10) / 1000;
+    const basePrice = item.discountBasePrice ?? this.orderBaseUnitPrice(item);
+    const unitPrice = Math.round(basePrice * (1 - discount) * 100) / 100;
+    this.setOrderDraftItems(draft.items.map(i => i.productId === productId
+      ? { ...i, discount, unitPrice, discountBasePrice: basePrice } : i));
+  }
+
   async updateOrderItemPrice(orderId: string, productId: number, newPrice: number): Promise<void> {
     const order = this.orderEditDraft()?.id === orderId ? this.orderEditDraft() : this.orders().find(o => o.id === orderId);
     if (!order || !this.canEditOrderPrice(order) || !Number.isFinite(newPrice) || newPrice < 0) return;
@@ -1617,7 +1631,7 @@ export class AppComponent implements OnInit {
     if (!item) return;
     const price = Math.round(newPrice * 100) / 100;
     if (order.status === 'shipped') {
-      if (this.isOrderItemEditable(order)) this.setOrderDraftItems(this.orderEditDraft()!.items.map(i => i.productId === productId ? { ...i, unitPrice: price } : i));
+      if (this.isOrderItemEditable(order)) this.setOrderDraftItems(this.orderEditDraft()!.items.map(i => i.productId === productId ? { ...i, unitPrice: price, discountBasePrice: undefined } : i));
       return;
     }
     if (price === item.unitPrice) return;

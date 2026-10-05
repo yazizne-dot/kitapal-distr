@@ -5,7 +5,7 @@ import ts from 'typescript';
 // Run the component's real permission methods without bootstrapping Angular.
 const source = ts.createSourceFile('component.ts', readFileSync(new URL('../src/app/app.component.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true);
 const component = source.statements.find(n => ts.isClassDeclaration(n) && n.name.text === 'AppComponent');
-const names = ['canEditOrder', 'canEditOrderPrice', 'isOrderItemEditable', 'startOrderEdit', 'cancelOrderEdit', 'setOrderDraftItems', 'updateOrderItemQty', 'updateOrderItemPrice', 'removeOrderItem', 'saveOrderEdit'];
+const names = ['canEditOrder', 'canEditOrderPrice', 'isOrderItemEditable', 'startOrderEdit', 'cancelOrderEdit', 'setOrderDraftItems', 'updateOrderItemQty', 'updateOrderItemPrice', 'removeOrderItem', 'saveOrderEdit', 'updateOrderItemDiscount'];
 const methods = component.members.filter(n => names.includes(n.name?.getText(source))).map(n => n.getText(source)).join('\n');
 const js = ts.transpileModule(`export class Permissions { ${methods} }`, { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
 const { Permissions } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
@@ -87,3 +87,27 @@ assert.equal(permissions.orderEditSaving(), false);
 permissions.cancelOrderEdit();
 assert.equal(permissions.orderEditError(), '');
 console.log('Shipped order save/error and draft mutations: passed');
+
+permissions.startOrderEdit();
+permissions.orderBaseUnitPrice = () => 300;
+permissions.setOrderDraftItems([{ ...shipped.items[0], unitPrice: 174, discount: .42, qty: 10 }]);
+assert.equal(typeof permissions.updateOrderItemDiscount, 'function', 'discount editing must be available');
+await permissions.updateOrderItemDiscount(shipped.id, 1, 50);
+assert.equal(permissions.orderEditDraft().items[0].discount, .5);
+assert.equal(permissions.orderEditDraft().items[0].unitPrice, 150);
+assert.equal(permissions.orderEditDraft().amount, 1500);
+await permissions.updateOrderItemDiscount(shipped.id, 1, 100);
+assert.equal(permissions.orderEditDraft().amount, 0);
+await permissions.updateOrderItemDiscount(shipped.id, 1, 0);
+assert.equal(permissions.orderEditDraft().amount, 3000);
+for (const invalid of [-1, 101, NaN]) {
+  await permissions.updateOrderItemDiscount(shipped.id, 1, invalid);
+  assert.equal(permissions.orderEditDraft().amount, 3000);
+}
+role = 'distributor';
+await permissions.updateOrderItemDiscount(shipped.id, 1, 50);
+assert.equal(permissions.orderEditDraft().amount, 3000);
+role = 'manager';
+permissions.cancelOrderEdit();
+assert.equal(shipped.amount, 200);
+console.log('Discount editing: recalculation, boundaries, permissions and cancel passed');
