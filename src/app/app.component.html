@@ -1008,7 +1008,14 @@
                       <small style="display:block;color:#66736e">{{ item.barcode }}</small>
                     </td>
                     <td>{{ item.publisher }}</td>
-                    <td>{{ item.discount | percent }}</td>
+                    <td>
+                      <ng-container *ngIf="orderEditDraft() && canEditOrderPrice(selectedOrder()!) && isOrderItemEditable(selectedOrder()!); else orderDiscountView">
+                        <input type="number" class="qty-edit-input" min="0" max="100" step="0.1"
+                          aria-label="Кітап жеңілдігі, пайыз" [ngModel]="item.discount * 100"
+                          (change)="updateOrderItemDiscount(selectedOrder()!.id, item.productId, $any($event.target).valueAsNumber)">%
+                      </ng-container>
+                      <ng-template #orderDiscountView>{{ item.discount | percent:'1.0-1' }}</ng-template>
+                    </td>
                     <td>
                       <input *ngIf="canEditOrderPrice(selectedOrder()!) && isOrderItemEditable(selectedOrder()!)" type="number" class="qty-edit-input" min="0" step="0.01"
                         aria-label="Кітап бағасы" [ngModel]="item.unitPrice"
