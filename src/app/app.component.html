@@ -205,7 +205,7 @@
                 <button type="button" class="btn-discount-edit" *ngIf="role() === 'admin'" title="Мақсатты өзгерту" (click)="startEditTarget(item)">✎</button>
               </ng-template>
             </td>
-            <td>{{ item.achieved | kzt }}</td>
+            <td>{{ (paymentsByDist().get(item.id) ?? 0) | kzt }}</td>
             <td>
               <ng-container *ngIf="role() === 'admin' && editingDiscountDistId() === item.id; else discountView">
                 <input type="number" class="discount-edit-input" [(ngModel)]="editDiscountStr" min="0" max="100" step="1">%
@@ -217,7 +217,7 @@
                 <button type="button" class="btn-discount-edit" *ngIf="role() === 'admin'" title="Жеңілдікті өзгерту" (click)="startEditDiscount(item)">✎</button>
               </ng-template>
             </td>
-            <td><span class="badge">{{ progress(item) | percent }}</span></td>
+            <td><span class="badge">{{ paymentProgress(item) | percent }}</span></td>
           </tr>
         </tbody>
       </table>
@@ -250,10 +250,12 @@
               <span class="card-open-hint">Айлар →</span>
             </div>
             <div class="card-progress">
-              <div class="card-progress-bar">
-                <div class="card-progress-fill" [style.width.%]="progress(item) * 100"></div>
+              <strong class="card-paid-amount">{{ (paymentsByDist().get(item.id) ?? 0) | kzt }} төленді</strong>
+              <div class="card-progress-bar" *ngIf="item.target > 0">
+                <div class="card-progress-fill" [style.width.%]="paymentProgress(item) * 100"></div>
               </div>
-              <small>{{ progress(item) | percent }} орындалды</small>
+              <small *ngIf="item.target > 0; else missingPaymentTarget">{{ paymentProgress(item) | percent:'1.1-1' }} мақсат орындалды</small>
+              <ng-template #missingPaymentTarget><small>6 айлық мақсат қойылмаған</small></ng-template>
             </div>
             <div class="partner-total">
               <span>Лимит: {{ item.creditLimit | kzt }}</span>
@@ -799,36 +801,25 @@
           <button type="button" *ngIf="isCurrentMonth()" [disabled]="orderCreating()" (click)="navigate('price')" class="btn-new-order">
             + Жаңа тапсырыс беру
           </button>
-        </div>
-
-        <!-- Ай вкладкалары -->
-        <div class="month-tabs-section">
-          <div class="month-tabs-label">Айды таңдаңыз (болашақ айлар жабық)</div>
-          <div class="month-tabs">
-            <button type="button"
-              *ngFor="let m of distributorAvailableMonths()"
-              class="month-tab"
-              [class.active]="distributorOrderMonth() === m"
-              [class.has-data]="!!distributorOrderCountByMonth()[m]"
-              (click)="distributorOrderMonth.set(m)">
-              <span class="mtab-name">{{ monthLabel(m) }}</span>
-              <span class="mtab-badge mtab-badge-light" *ngIf="m === CURRENT_MONTH">Ағымды</span>
-              <span class="mtab-badge" *ngIf="m !== CURRENT_MONTH && distributorOrderCountByMonth()[m]">
-                {{ distributorOrderCountByMonth()[m] }}
-              </span>
-            </button>
+          <div class="order-history-filter">
+            <label>Ай бойынша
+              <input type="month" [max]="CURRENT_MONTH" [disabled]="orderEditSaving()" [ngModel]="distributorOrderMonth() === 'all' ? '' : distributorOrderMonth()" (ngModelChange)="setOrderHistoryMonth($event)">
+            </label>
+            <button type="button" class="month-tab" [class.active]="distributorOrderMonth() === 'all'" [disabled]="orderEditSaving()" (click)="setOrderHistoryMonth('all')">Барлығы</button>
           </div>
         </div>
 
+        <p class="result-count">{{ distributorCurrentMonthOrders().length }} тапсырыс · {{ distributorOrderMonth() === 'all' ? 'Барлық кезең' : monthLabel(distributorOrderMonth()) }}</p>
+
         <!-- Архив хабары (өткен айлар) -->
-        <div class="archive-notice" *ngIf="!isCurrentMonth()">
-          🗂 {{ monthLabel(distributorOrderMonth()) }} — архив. Тапсырыстарды өзгерту мүмкін емес.
+        <div class="archive-notice" *ngIf="!isCurrentMonth() && distributorOrderMonth() !== 'all'">
+          {{ monthLabel(distributorOrderMonth()) }} — тапсырыстар тарихы. Тізімнен тапсырысты таңдап, кітаптары мен статус тарихын көріңіз.
         </div>
 
         <!-- Бос ай -->
         <div class="month-empty-state" *ngIf="distributorCurrentMonthOrders().length === 0">
           <span>📦</span>
-          <p>{{ monthLabel(distributorOrderMonth()) }} айында тапсырыс жоқ</p>
+          <p>{{ distributorOrderMonth() === 'all' ? 'Әзірге тапсырыс жоқ' : monthLabel(distributorOrderMonth()) + ' айында тапсырыс жоқ' }}</p>
           <button type="button" *ngIf="isCurrentMonth()" [disabled]="orderCreating()" (click)="navigate('price')" class="btn-new-order">
             + Прайс-листтен тапсырыс беру
           </button>
@@ -842,35 +833,21 @@
             <h2>Тапсырыстар</h2>
           </div>
           <div class="head-actions">
-            <select [ngModel]="orderFilterDistributorId()" (ngModelChange)="setOrderDistributorFilter(+$event)">
+            <select aria-label="Дистрибьютор бойынша" [disabled]="orderEditSaving()" [ngModel]="orderFilterDistributorId()" (ngModelChange)="setOrderDistributorFilter(+$event)">
               <option value="0">— Барлық дистрибьюторлар —</option>
               <option *ngFor="let item of visibleDistributors()" [value]="item.id">{{ item.company }}</option>
             </select>
+            <div class="order-history-filter">
+              <label>Ай бойынша
+                <input type="month" [max]="CURRENT_MONTH" [disabled]="orderEditSaving()" [ngModel]="managerOrderMonth() === 'all' ? '' : managerOrderMonth()" (ngModelChange)="setOrderHistoryMonth($event)">
+              </label>
+              <button type="button" class="month-tab" [class.active]="managerOrderMonth() === 'all'" [disabled]="orderEditSaving()" (click)="setOrderHistoryMonth('all')">Барлығы</button>
+            </div>
           </div>
         </div>
 
-        <!-- Ай бойынша фильтр -->
-        <div class="month-tabs-section">
-          <div class="month-tabs">
-            <button type="button" class="month-tab"
-              [class.active]="managerOrderMonth() === 'all'"
-              (click)="managerOrderMonth.set('all')">
-              Барлығы
-              <span class="mtab-badge">{{ managerDistributorOrders().length }}</span>
-            </button>
-            <button type="button" class="month-tab"
-              *ngFor="let m of managerAvailableMonths()"
-              [class.active]="managerOrderMonth() === m"
-              [class.has-data]="true"
-              (click)="managerOrderMonth.set(m)">
-              {{ monthLabel(m) }}
-              <span class="mtab-badge"
-                [class.mtab-badge-pending]="managerOrderMonthCounts()[m] > 0">
-                {{ managerOrderMonthCounts()[m] }}
-              </span>
-            </button>
-          </div>
-        </div>
+        <p class="result-count">{{ adminManagerOrders().length }} тапсырыс · {{ managerOrderMonth() === 'all' ? 'Барлық кезең' : monthLabel(managerOrderMonth()) }}</p>
+        <p class="month-empty-state" *ngIf="!adminManagerOrders().length">Таңдалған кезеңде тапсырыс жоқ.</p>
 
         <!-- Назар аударуды қажет (pending + draft) -->
         <div class="pending-alert-bar" *ngIf="pendingOrders().length > 0">
@@ -920,7 +897,7 @@
                 [class.row-selected]="selectedOrderId() === order.id"
                 (click)="openOrder(order.id)"
               >
-                <td class="order-num">{{ order.id }}</td>
+                <td class="order-num">{{ order.id }}<small class="order-history-summary">{{ orderProductsLabel(order) }} · {{ totalOrderQty(order) }} дана</small></td>
                 <td *ngIf="role() !== 'distributor'">{{ orderDistributor(order).company }}</td>
                 <td>
                   <span class="badge"
@@ -932,7 +909,7 @@
                   >{{ statusLabel(order.status) }}</span>
                 </td>
                 <td>{{ order.amount | kzt }}</td>
-                <td>{{ order.createdAt | date:'dd.MM' }}</td>
+                <td class="order-history-date">{{ order.createdAt | date:'dd.MM.yyyy':'+0500' }}</td>
                 <td (click)="$event.stopPropagation()">
                   <button
                     *ngIf="order.status === 'cancelled' || order.status === 'draft'"
@@ -951,7 +928,7 @@
             <div>
               <span class="order-detail-num">{{ selectedOrder()!.id }}</span>
               <p>{{ orderDistributor(selectedOrder()!).company }} · {{ orderDistributor(selectedOrder()!).city }}</p>
-              <small>{{ selectedOrder()!.createdAt | date:'dd.MM.yyyy' }}</small>
+              <small>{{ selectedOrder()!.createdAt | date:'dd.MM.yyyy HH:mm':'+0500' }}</small>
             </div>
             <span class="badge"
               [class.badge-pending]="selectedOrder()!.status === 'pending'"
@@ -1055,7 +1032,7 @@
                     [class.danger]="h.status === 'draft' || h.status === 'cancelled'"
                   >{{ statusLabel(h.status) }}</span>
                   <span>{{ h.text }}</span>
-                  <small>{{ h.date | date:'dd.MM.yyyy' }}</small>
+                  <small>{{ h.date | date:'dd.MM.yyyy HH:mm':'+0500' }}</small>
                 </div>
               </div>
             </div>
@@ -1203,21 +1180,28 @@
         <div>
           <h2>Қарыз және лимит жүйесі</h2>
         </div>
+        <label class="debt-month-filter">Ай бойынша
+          <input type="month" [max]="debtCurrentMonth" [disabled]="openingDebtSaving()" [ngModel]="debtMonth()" (ngModelChange)="changeDebtMonth($event)">
+        </label>
       </div>
+      <p *ngIf="monthlyDebtService.loading()" role="status">Айлық есеп жүктелуде…</p>
+      <p *ngIf="monthlyDebtService.error()" role="alert">{{ monthlyDebtService.error() }}
+        <button type="button" (click)="changeDebtMonth(debtMonth())">Қайта көру</button>
+      </p>
 
       <!-- Жалпы қорытынды -->
-      <div class="debt-summary-strip">
+      <div class="debt-summary-strip" *ngIf="!monthlyDebtService.loading() && !monthlyDebtService.error()">
         <article>
           <span>Жалпы қарыз</span>
-          <strong class="debt-total-val">{{ totalDebt() | kzt }}</strong>
+          <strong class="debt-total-val">{{ monthlyTotalDebt() | kzt }}</strong>
         </article>
         <article>
           <span>Тіркелген төлемдер</span>
-          <strong class="paid-total-val">{{ totalPaid() | kzt }}</strong>
+          <strong class="paid-total-val">{{ monthlyTotalPaid() | kzt }}</strong>
         </article>
         <article>
           <span>Дистрибьюторлар саны</span>
-          <strong>{{ visibleDistributors().length }}</strong>
+          <strong>{{ debtRows().length }}</strong>
         </article>
       </div>
 
@@ -1235,24 +1219,39 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let item of visibleDistributors()">
+          <tr *ngFor="let item of debtRows()">
             <td><strong>{{ item.company }}</strong></td>
             <td>{{ item.city }}</td>
-            <td class="muted">{{ item.openingDebt == null ? '—' : (item.openingDebt | kzt) }}</td>
-            <td class="paid-cell">
-              <span *ngIf="(paymentsByDist().get(item.id) ?? 0) > 0">
-                −{{ paymentsByDist().get(item.id) | kzt }}
-              </span>
-              <span *ngIf="!(paymentsByDist().get(item.id) ?? 0)" class="muted">—</span>
+            <td class="muted opening-debt-cell">
+              <ng-container *ngIf="editingOpeningDebtId() === item.id; else openingDebtView">
+                <div class="opening-debt-editor">
+                <input type="number" class="opening-debt-input" aria-label="Ай басындағы қарыз" step="0.01" [(ngModel)]="openingDebtInput" [disabled]="openingDebtSaving()" (keydown.enter)="saveOpeningDebt()">
+                <div class="opening-debt-actions">
+                <button type="button" class="btn-discount-save" [disabled]="openingDebtSaving()" (click)="saveOpeningDebt()">{{ openingDebtSaving() ? 'Сақталуда…' : 'Сақтау' }}</button>
+                <button type="button" class="btn-discount-cancel" [disabled]="openingDebtSaving()" (click)="editingOpeningDebtId.set(null)">Бас тарту</button>
+                </div>
+                <small *ngIf="openingDebtError" role="alert">{{ openingDebtError }}</small>
+                </div>
+              </ng-container>
+              <ng-template #openingDebtView>
+                {{ item.openingDebt == null ? '—' : (item.openingDebt | kzt) }}
+                <button type="button" class="btn-discount-edit" *ngIf="(role() === 'admin' || role() === 'manager') && debtMonth() === debtCurrentMonth" [disabled]="openingDebtSaving()" title="Ай басындағы қарызды өзгерту" (click)="startEditOpeningDebt(item)">✎ Өзгерту</button>
+              </ng-template>
             </td>
-            <td>
+            <td class="paid-cell debt-amount-cell">
+              <span *ngIf="item.paid > 0">
+                {{ item.paid | kzt }}
+              </span>
+              <span *ngIf="!item.paid" class="muted">—</span>
+            </td>
+            <td class="debt-amount-cell">
               <strong [class.overdue]="item.debt > item.creditLimit">
                 {{ item.debt | kzt }}
               </strong>
             </td>
             <td class="limit-cell">
               <strong>{{ item.creditLimit | kzt }}</strong>
-              <button type="button" class="btn-financial" *ngIf="role() === 'admin'" (click)="openFinancialModal(item)">
+              <button type="button" class="btn-financial" *ngIf="role() === 'admin' && debtMonth() === debtCurrentMonth" (click)="openFinancialModal(item)">
                 Лимит/қарыз
               </button>
             </td>
@@ -1262,17 +1261,18 @@
               </span>
             </td>
             <td *ngIf="role() === 'admin' || role() === 'manager'">
-              <button type="button" class="btn-pay" (click)="openPaymentModal(item.id)">+ Төлем</button>
+              <button type="button" class="btn-pay" *ngIf="debtMonth() === debtCurrentMonth" (click)="openPaymentModal(item.id)">+ Төлем</button>
             </td>
           </tr>
         </tbody>
       </table>
 
       <!-- Төлемдер тарихы -->
+      <p *ngIf="!monthlyDebtService.loading() && !monthlyDebtService.error() && !debtRows().length">Бұл ай бойынша сақталған есеп жоқ.</p>
       <div class="payment-history">
         <div class="pay-hist-header">
           <h3>Төлемдер тарихы
-            <span class="pay-hist-count" *ngIf="payments().length > 0">({{ payments().length }})</span>
+            <span class="pay-hist-count" *ngIf="filteredPayments().length > 0">({{ filteredPayments().length }})</span>
           </h3>
           <div class="pay-filter-row">
             <label class="pay-filter-label" *ngIf="role() === 'admin' || role() === 'manager'">
@@ -1375,9 +1375,14 @@
       <div class="section-head">
         <div>
           <h2>Пайдаланушылар</h2>
-          <small class="result-count">{{ accounts().length }} аккаунт</small>
+          <small class="result-count" *ngIf="!accountService.loading() && !accountService.loadError()">{{ accounts().length }} аккаунт</small>
         </div>
         <button type="button" (click)="openAccountModal()">+ Жаңа пайдаланушы</button>
+      </div>
+      <p *ngIf="accountService.loading()" role="status">Пайдаланушылар жүктелуде…</p>
+      <div *ngIf="accountService.loadError()" role="alert">
+        <p>{{ accountService.loadError() }}</p>
+        <button type="button" [disabled]="accountService.loading()" (click)="reloadAccounts()">Қайта жүктеу</button>
       </div>
 
       <table>

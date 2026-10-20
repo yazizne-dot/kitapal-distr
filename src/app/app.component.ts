@@ -1,15 +1,17 @@
 import { CommonModule, DatePipe, PercentPipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 // xlsx import removed — накладная is now generated as HTML (Form З-2)
 import { type Product } from './price-products';
 import { undiscountedPrice } from './core/utils/order-pricing';
+import { filterOrderHistory, orderMonthKey } from './core/utils/order-history';
 import { KztPipe } from './kzt.pipe';
 import { AuthService, loginToEmail } from './core/services/auth.service';
 import { ProductService } from './core/services/product.service';
 import { DistributorService, periodLabel } from './core/services/distributor.service';
 import { OrderService, decideStatus } from './core/services/order.service';
 import { PaymentService } from './core/services/payment.service';
+import { MonthlyDebtService } from './core/services/monthly-debt.service';
 import { MessageService } from './core/services/message.service';
 import { NotificationService } from './core/services/notification.service';
 import { AccountService } from './core/services/account.service';
@@ -323,7 +325,7 @@ const orders: Order[] = [
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   private readonly cityCodeMap: Record<string, string> = {
     'Астана': 'AST', 'Шымкент': 'SHY', 'Ақтау': 'AKT',
     'Қызылорда': 'KYZ', 'Тараз': 'TAR', 'Жезқазған': 'JEZ',
@@ -335,6 +337,63 @@ export class AppComponent implements OnInit {
   role = signal<Role>('admin');
   currentUser = signal<UserAccount | null>(null);
   activeScreen = signal('overview');
+  readonly monthlyDebtService = inject(MonthlyDebtService);
+  debtCurrentMonth = orderMonthKey(new Date().toISOString());
+  readonly debtMonth = signal(this.debtCurrentMonth);
+  readonly editingOpeningDebtId = signal<number | null>(null);
+  readonly openingDebtSaving = signal(false);
+  openingDebtInput: string | number | null = '';
+  openingDebtError = '';
+  private openingDebtOriginal = 0;
+  private openingDebtMonth = '';
+  readonly debtRows = computed(() => {
+    const visible = new Map(this.visibleDistributors().map(d => [d.id, d]));
+    return this.monthlyDebtService.rows().flatMap(row => {
+      const d = visible.get(row.distributor_id);
+      return d ? [{ ...d, debt: row.debt, openingDebt: row.opening_debt, paid: row.paid, creditLimit: row.credit_limit }] : [];
+    });
+  });
+  readonly monthlyTotalDebt = computed(() => this.debtRows().reduce((sum, d) => sum + d.debt, 0));
+  readonly monthlyTotalPaid = computed(() => this.debtRows().reduce((sum, d) => sum + d.paid, 0));
+
+  async changeDebtMonth(month: string): Promise<void> {
+    if (this.openingDebtSaving()) return;
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || month > this.debtCurrentMonth) return;
+    this.debtMonth.set(month);
+    this.editingOpeningDebtId.set(null);
+    this.openingDebtError = '';
+    await this.monthlyDebtService.load(month);
+  }
+
+  startEditOpeningDebt(distributor: Distributor): void {
+    if (!['admin', 'manager'].includes(this.role()) || this.debtMonth() !== this.debtCurrentMonth || this.openingDebtSaving()) return;
+    this.openingDebtOriginal = distributor.openingDebt ?? 0;
+    this.openingDebtMonth = this.debtMonth();
+    this.openingDebtInput = String(this.openingDebtOriginal);
+    this.openingDebtError = '';
+    this.editingOpeningDebtId.set(distributor.id);
+  }
+
+  async saveOpeningDebt(): Promise<void> {
+    const id = this.editingOpeningDebtId();
+    if (id === null || !['admin', 'manager'].includes(this.role()) || this.openingDebtSaving() ||
+        this.debtMonth() !== this.debtCurrentMonth || this.openingDebtMonth !== this.debtMonth()) return;
+    const amount = Number(this.openingDebtInput);
+    if (!String(this.openingDebtInput ?? '').trim() || !Number.isFinite(amount) || Math.abs(amount) > 999999999999.99) {
+      this.openingDebtError = 'Қарыз сомасын дұрыс енгізіңіз.';
+      return;
+    }
+    this.openingDebtSaving.set(true);
+    this.openingDebtError = '';
+    try {
+      const error = await this.monthlyDebtService.setOpeningDebt(id, this.openingDebtMonth, amount, this.openingDebtOriginal);
+      if (error) { this.openingDebtError = error; return; }
+      this.editingOpeningDebtId.set(null);
+      await this.reloadAll();
+    } finally {
+      this.openingDebtSaving.set(false);
+    }
+  }
   selectedDistributorId = signal(1);
   productQuery = signal('');
   selectedCategory = signal('Барлығы');
@@ -489,15 +548,34 @@ export class AppComponent implements OnInit {
   private paymentService = inject(PaymentService);
   private messageService = inject(MessageService);
   private notificationService = inject(NotificationService);
-  private accountService = inject(AccountService);
+  readonly accountService = inject(AccountService);
+  private calendarTimer?: ReturnType<typeof setInterval>;
 
   async ngOnInit(): Promise<void> {
+    this.calendarTimer = setInterval(() => this.refreshCalendarMonth(), 60000);
     // Restore an existing Supabase session, if any.
     await this.authService.loadProfile();
     if (this.authService.signedIn()) {
       this.applyAuthState();
       await this.reloadAll();
     }
+  }
+
+  ngOnDestroy(): void {
+    if (this.calendarTimer) clearInterval(this.calendarTimer);
+  }
+
+  @HostListener('window:focus')
+  refreshCalendarMonth(): void {
+    const month = orderMonthKey(new Date().toISOString());
+    if (month === this.debtCurrentMonth) return;
+    const previous = this.debtCurrentMonth;
+    this.debtCurrentMonth = month;
+    this.CURRENT_MONTH = month;
+    if (this.debtMonth() === previous) this.debtMonth.set(month);
+    if (this.distributorOrderMonth() === previous) this.distributorOrderMonth.set(month);
+    this.editingOpeningDebtId.set(null);
+    if (this.signedIn() && this.activeScreen() === 'debts') void this.monthlyDebtService.load(this.debtMonth());
   }
 
   private applyAuthState(): void {
@@ -519,6 +597,7 @@ export class AppComponent implements OnInit {
       this.paymentService.load(),
       this.messageService.load(),
       this.notificationService.load(),
+      this.monthlyDebtService.load(this.debtMonth()),
     ]);
     this.products.set(this.productService.products().map(p => ({
       id: p.id, barcode: p.barcode, name: p.name, publisher: p.publisher,
@@ -556,12 +635,17 @@ export class AppComponent implements OnInit {
     })));
     // User management is admin-only (Edge Function rejects others).
     if (this.role() === 'admin') {
-      await this.accountService.load();
-      this.accounts.set(this.accountService.accounts().map(a => ({
-        id: a.id, name: a.full_name, login: a.login, password: '',
-        role: a.role, distributorId: a.distributor_id ?? undefined,
-      })));
+      await this.reloadAccounts();
     }
+  }
+
+  async reloadAccounts(): Promise<void> {
+    if (this.role() !== 'admin') return;
+    await this.accountService.load();
+    this.accounts.set(this.accountService.accounts().map(a => ({
+      id: a.id, name: a.full_name, login: a.login, password: '',
+      role: a.role, distributorId: a.distributor_id ?? undefined,
+    })));
   }
 
   adminMenu = [
@@ -735,21 +819,21 @@ export class AppComponent implements OnInit {
     '2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'
   ];
   // Current active month — distributors cannot go beyond this
-  readonly CURRENT_MONTH = this.currentMonthKey();
+  CURRENT_MONTH = this.currentMonthKey();
 
   // Distributor order month selection
   distributorOrderMonth = signal<string>(this.CURRENT_MONTH);
 
   // Available months for distributor (current + past only)
   distributorAvailableMonths = computed(() => {
-    const idx = this.YEAR_MONTHS.indexOf(this.CURRENT_MONTH);
-    return this.YEAR_MONTHS.slice(0, idx + 1);
+    return [...new Set([this.CURRENT_MONTH, ...this.visibleOrders().map(o => orderMonthKey(o.createdAt))])]
+      .filter(m => m && m <= this.CURRENT_MONTH).sort().reverse();
   });
 
   // Distributor's orders filtered by selected month
   distributorMonthOrders = computed(() => {
     const m = this.distributorOrderMonth();
-    return this.visibleOrders().filter(o => o.createdAt.startsWith(m));
+    return filterOrderHistory(this.visibleOrders(), m, this.selectedDistributorId());
   });
 
   isCurrentMonth = computed(() => this.distributorOrderMonth() === this.CURRENT_MONTH);
@@ -758,7 +842,7 @@ export class AppComponent implements OnInit {
   distributorOrderCountByMonth = computed(() => {
     const map: Record<string, number> = {};
     this.visibleOrders().forEach(o => {
-      const m = o.createdAt.substring(0, 7);
+      const m = orderMonthKey(o.createdAt);
       map[m] = (map[m] ?? 0) + 1;
     });
     return map;
@@ -766,8 +850,7 @@ export class AppComponent implements OnInit {
 
   // Orders for distributor in the currently selected month
   distributorCurrentMonthOrders = computed(() => {
-    const m = this.distributorOrderMonth();
-    return this.visibleOrders().filter(o => o.createdAt.startsWith(m));
+    return this.distributorMonthOrders();
   });
 
   // Manager monthly filter
@@ -780,8 +863,17 @@ export class AppComponent implements OnInit {
   });
 
   setOrderDistributorFilter(id: number): void {
+    if (this.orderEditSaving()) return;
     this.orderFilterDistributorId.set(id);
-    this.managerOrderMonth.set('all');
+    this.cancelOrderEdit();
+    this.selectedOrderId.set('');
+  }
+
+  setOrderHistoryMonth(month: string): void {
+    if (this.orderEditSaving() || (month !== 'all' && (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || month > this.CURRENT_MONTH))) return;
+    if (this.role() === 'distributor') this.distributorOrderMonth.set(month);
+    else this.managerOrderMonth.set(month);
+    this.cancelOrderEdit();
     this.selectedOrderId.set('');
   }
 
@@ -789,7 +881,7 @@ export class AppComponent implements OnInit {
   managerOrderMonthCounts = computed(() => {
     const map: Record<string, number> = {};
     this.managerDistributorOrders().forEach(o => {
-      const m = o.createdAt.substring(0, 7);
+      const m = orderMonthKey(o.createdAt);
       map[m] = (map[m] ?? 0) + 1;
     });
     return map;
@@ -803,7 +895,7 @@ export class AppComponent implements OnInit {
   // Admin/manager orders list — filtered by month and optionally by distributor
   adminManagerOrders = computed(() => {
     const m = this.managerOrderMonth();
-    return this.managerDistributorOrders().filter(o => m === 'all' || o.createdAt.startsWith(m));
+    return filterOrderHistory(this.managerDistributorOrders(), m);
   });
 
   selectedDetailDistributor = computed(() => {
@@ -1067,7 +1159,7 @@ export class AppComponent implements OnInit {
   }
 
   filteredPayments = computed(() => {
-    const list = this.payments().slice().reverse();
+    const list = this.payments().filter(p => p.date.startsWith(this.debtMonth())).slice().reverse();
     if (this.role() === 'distributor') {
       return list.filter(p => p.distributorId === this.selectedDistributorId());
     }
@@ -1327,11 +1419,14 @@ export class AppComponent implements OnInit {
   }
 
   navigate(screen: string): void {
+    this.refreshCalendarMonth();
     if (screen === 'analytics' && this.role() !== 'admin') return;
     if (screen === 'orders' && this.role() !== 'distributor') {
       this.setOrderDistributorFilter(0);
     }
     this.activeScreen.set(screen);
+    if (screen === 'users' && this.role() === 'admin') void this.reloadAccounts();
+    if (screen === 'debts') void this.monthlyDebtService.load(this.debtMonth());
     this.distributorDetailId.set(null);
     this.detailActiveMonth.set('all');
   }
@@ -2077,8 +2172,7 @@ h1{text-align:center;font-size:10pt;font-weight:bold;text-transform:uppercase;ma
   }
 
   private currentMonthKey(): string {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return orderMonthKey(new Date().toISOString());
   }
 
   private todayDateKey(): string {

@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const signal = value => {const f=()=>value;f.set=v=>value=v;return f;};
+let invokes=0, refreshes=0, mode='expired';
+const rows=[{id:'user',login:'test',full_name:'Test',role:'distributor',distributor_id:1}];
+const supabase={functions:{invoke:async()=>{
+  invokes++;
+  if(mode==='expired' && invokes===1)return {error:{context:{status:401}}};
+  if(mode==='denied')return {error:{context:{status:403}}};
+  if(mode==='network')throw Error('network');
+  return {data:{users:rows},error:null};
+}},auth:{refreshSession:async()=>{refreshes++;return {error:null};}}};
+const exports={};
+const source=readFileSync('src/app/core/services/account.service.ts','utf8');
+new Function('require','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,experimentalDecorators:true}}).outputText)(name=>name==='@angular/core'?{Injectable:()=>c=>c,signal}:{supabase},exports);
+const service=new exports.AccountService();
+await service.load();
+assert.equal(refreshes,1,'expired session should refresh once');assert.equal(invokes,2);
+assert.deepEqual(service.accounts(),rows);assert.equal(service.loadError(),'');
+mode='denied';await service.load();assert.ok(service.loadError());assert.deepEqual(service.accounts(),rows,'failed reload must preserve existing users');
+mode='network';await service.load();assert.ok(service.loadError());assert.equal(service.loading(),false);
+mode='ok';await service.load();assert.equal(service.loadError(),'');
+console.log('Account loading: expired session retry, permission error, network recovery and preserved users passed');

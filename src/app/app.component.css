@@ -4163,6 +4163,29 @@ td,
 .price-workspace {
   grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
 }
+.order-history-filter, .order-history-filter label { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.order-history-filter input { min-height: 44px; max-width: 100%; box-sizing: border-box; padding: 10px 14px; border: 1px solid var(--border-soft); border-radius: 10px; background: white; color: inherit; font: inherit; }
+.order-history-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.order-history-summary { display: block; margin-top: 6px; color: var(--text-muted); font-weight: normal; }
+.card-paid-amount { display: block; margin-bottom: 10px; color: #1a8c4e; font-variant-numeric: tabular-nums; }
+.debt-amount-cell { min-width: 180px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.debt-amount-cell span, .debt-amount-cell strong { white-space: nowrap; }
+.opening-debt-cell { min-width: 240px; }
+.opening-debt-editor { display: grid; gap: 10px; width: 240px; }
+.opening-debt-input {
+  box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px;
+  padding: 10px 12px; border: 1px solid var(--border-soft, #e9dce6);
+  border-radius: 10px; background: white; color: var(--text-body, #30252c);
+  font: inherit; font-variant-numeric: tabular-nums;
+}
+.opening-debt-input:focus { outline: 2px solid var(--kitapal-primary, #b52278); outline-offset: 2px; }
+.opening-debt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.opening-debt-actions button { margin: 0; padding: 8px 12px; min-height: 40px; white-space: nowrap; }
+.opening-debt-actions .btn-discount-save { background: #e8f5ee; }
+.opening-debt-actions .btn-discount-cancel { background: #fff1f1; }
+.opening-debt-editor small { white-space: normal; color: #b23b35; }
+.debt-month-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.debt-month-filter input { padding: 10px 14px; border: 1px solid #e9dce6; border-radius: 10px; background: white; font: inherit; }
 .price-main { container-type: inline-size; }
 .price-card-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
