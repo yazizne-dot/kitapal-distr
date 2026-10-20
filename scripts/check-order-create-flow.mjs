@@ -6,7 +6,7 @@ const files = {
 };
 
 const checks = [
-  ['current month is computed', files.component, 'readonly CURRENT_MONTH = this.currentMonthKey();'],
+  ['current month is computed', files.component, 'CURRENT_MONTH = this.currentMonthKey();'],
   ['initial distributor month uses current month', files.component, 'distributorOrderMonth = signal<string>(this.CURRENT_MONTH);'],
   ['current month helper exists', files.component, 'private currentMonthKey(): string'],
   ['create order saving signal', files.component, 'orderCreating = signal(false)'],

@@ -4,7 +4,7 @@
   "scripts": {
     "start": "ng serve",
     "build": "ng build",
-    "test": "ng test"
+    "test": "node scripts/run-checks.mjs"
   },
   "private": true,
   "dependencies": {

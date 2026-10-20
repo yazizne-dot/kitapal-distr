@@ -13,11 +13,35 @@ export interface AccountRow {
 @Injectable({ providedIn: 'root' })
 export class AccountService {
   readonly accounts = signal<AccountRow[]>([]);
+  readonly loading = signal(false);
+  readonly loadError = signal('');
 
   // All operations go through the admin-users Edge Function (service_role lives server-side).
   async load(): Promise<void> {
-    const { data, error } = await supabase.functions.invoke('admin-users', { body: { action: 'list' } });
-    if (!error && data?.users) this.accounts.set(data.users as AccountRow[]);
+    if (this.loading()) return;
+    this.loading.set(true);
+    this.loadError.set('');
+    try {
+      let result = await supabase.functions.invoke('admin-users', { body: { action: 'list' } });
+      if (result.error?.context?.status === 401) {
+        const refreshed = await supabase.auth.refreshSession();
+        if (!refreshed.error) result = await supabase.functions.invoke('admin-users', { body: { action: 'list' } });
+      }
+      if (result.error || result.data?.error || !Array.isArray(result.data?.users)) {
+        const status = result.error?.context?.status;
+        this.loadError.set(status === 401
+          ? 'Сессияның мерзімі аяқталды. Аккаунтқа қайта кіріңіз.'
+          : status === 403
+            ? 'Пайдаланушылар тізімін көруге әкімші рұқсаты қажет.'
+            : 'Пайдаланушылар жүктелмеді. Сервермен байланысты тексеріп, қайта көріңіз.');
+        return;
+      }
+      this.accounts.set(result.data.users as AccountRow[]);
+    } catch {
+      this.loadError.set('Пайдаланушылар жүктелмеді. Байланысты тексеріп, қайта көріңіз.');
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   async create(login: string, name: string, role: Role, distributorId: number | null, password: string): Promise<string | null> {
