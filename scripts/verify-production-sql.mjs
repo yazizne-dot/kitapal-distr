@@ -21,4 +21,8 @@ insert into public.monthly_opening_debts(distributor_id,month_start,amount,credi
 select id,(date_trunc('month',now() at time zone 'Asia/Almaty')-interval '3 months')::date,100,1000 from public.distributors where company='Gap regression';`+bundle.replace(/^begin;\s*$/gmi,'').replace(/^commit;\s*$/gmi,'')+`
 do $$begin assert(select count(*)=4 from public.monthly_opening_debts m join public.distributors d on d.id=m.distributor_id where d.company='Gap regression'),'Missing intervening months';end$$;
 rollback;`);
+await apply('catalogue pack-size prerequisite',read('supabase/migrations/20260924130000_product_pack_size.sql'));
+await apply('product archive and manager price',read('supabase/migrations/20261022090000_product_archive_and_manager_price.sql'));
+await apply('product archive migration rerun',read('supabase/migrations/20261022090000_product_archive_and_manager_price.sql'));
+await apply('product archive and price regression',read('supabase/tests/product_archive_and_price.sql'));
 await db.close();
