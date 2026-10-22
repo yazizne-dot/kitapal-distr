@@ -23,6 +23,7 @@ for(const [key,value] of Object.entries({editingProductId:null,creatingProduct:f
 c.role=()=> 'admin'; c.products=()=>[];c.reloadAll=async()=>{};
 let creates=0;c.productService={create:async input=>{creates++;assert.equal(input.base_price,3000);return null;}};
 c.productService.setPackSize=async()=>null;
+c.productService.setPriceAndPackSize=async()=>null;
 c.openCreateProduct();await c.saveEditProduct();assert.equal(creates,0);assert.ok(c.productError);
 c.editProdName='New';c.editProdBarcode='001';c.editProdPublisher='Publisher';c.editProdBasePrice=3000;
 await c.saveEditProduct();assert.equal(creates,1);assert.equal(c.productQuery(),'001');assert.equal(c.creatingProduct(),false);

@@ -55,7 +55,15 @@ export class OrderService {
       unit_price: i.unitPrice, discount: i.discount,
     }));
     const { error: iErr } = await supabase.from('order_items').insert(rows);
-    if (iErr) return iErr.message;
+    if (iErr) {
+      // A catalogue item can be archived after the customer opened their cart.
+      // Remove only this request's header when the item insert is rejected.
+      const { error: cleanupError } = await supabase.from('orders').delete().eq('id', order.id);
+      if (cleanupError) return `Тапсырыс толық жасалмады (${order.id}). Бетті жаңартып, осы тапсырысты тексеріңіз.`;
+      return iErr.code === '22023'
+        ? 'Таңдалған кітап прайстан алынған. Прайсты жаңартып, тапсырысты қайта беріңіз.'
+        : iErr.message;
+    }
     await this.addHistory(order.id, status,
       status === 'draft' ? 'Лимиттен асқандықтан черновик болып сақталды' : 'Дистрибьютор тапсырыс жіберді');
     await this.load();

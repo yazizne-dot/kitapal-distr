@@ -8,4 +8,5 @@ export interface Product {
   discount_override: number | null;
   cover_path?: string | null;
   pack_size?: number | null;
+  archived_at?: string | null;
 }

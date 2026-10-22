@@ -1056,7 +1056,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.productError = 'Бастапқы сальдо қызметтік жазбасын жоюға болмайды.';
       return;
     }
-    if (!confirm(`«${product.name}» кітабын прайстан жоясыз ба?`)) return;
+    if (!confirm(`«${product.name}» кітабын прайстан жоясыз ба? Бұрынғы тапсырыстар сақталады.`)) return;
     this.productSaving.set(true);
     try {
       const error = await this.productService.remove(id);
@@ -1113,7 +1113,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.productSaving.set(true);
     try {
       const error = creating ? await this.productService.create(input)
-        : this.role() === 'admin' ? await this.productService.update(id!, input) : await this.productService.setPackSize(id!, input.pack_size);
+        : this.role() === 'admin' ? await this.productService.update(id!, input) : await this.productService.setPriceAndPackSize(id!, input.base_price, input.pack_size);
       if (error) { this.productError = error; return; }
       if (!creating && this.editCoverChanged) {
         const coverError = await this.productService.saveCover(id!, this.editCoverFile);
@@ -1621,6 +1621,10 @@ export class AppComponent implements OnInit, OnDestroy {
     this.orderEditDraft.set({ ...draft, items: updated, amount: updated.reduce((sum, item) => sum + item.amount, 0) });
   }
 
+  trackOrderItem(_index: number, item: OrderItem): string {
+    return `${item.productId}:${item.id ?? 'new'}`;
+  }
+
   async saveOrderEdit(): Promise<void> {
     const draft = this.orderEditDraft();
     if (!draft?.uuid || this.orderEditSaving() || !this.canEditOrderPrice(draft)) return;
@@ -1632,6 +1636,9 @@ export class AppComponent implements OnInit, OnDestroy {
       if (error) { this.orderEditError.set('Өзгерістер сақталмады: ' + error); return; }
       this.orderEditDraft.set(null);
       await this.reloadAll();
+      globalThis.requestAnimationFrame?.(() => {
+        globalThis.document?.getElementById('order-detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     } catch {
       this.orderEditError.set('Сақтау кезінде қате болды. Қайта көріңіз.');
     } finally {

@@ -4,6 +4,18 @@ import { Product } from '../models/product';
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
+  async setPriceAndPackSize(id: number, price: number, size: number | null): Promise<string | null> {
+    if (!Number.isFinite(price) || price <= 0 || price > 9999999999.99 ||
+        (size !== null && (!Number.isInteger(size) || size <= 0 || size > 2147483647))) {
+      return 'Баға мен пачкадағы санды дұрыс енгізіңіз.';
+    }
+    const { error } = await supabase.rpc('set_product_price_and_pack_size', {
+      p_product_id: id, p_base_price: price, p_pack_size: size,
+    });
+    if (error) return 'Баға сақталмады. Рұқсат пен SQL жаңартуын тексеріп, қайта көріңіз.';
+    await this.load();
+    return null;
+  }
   async setPackSize(id: number, size: number | null): Promise<string | null> {
     const { error } = await supabase.rpc('set_product_pack_size', { product_id: id, new_size: size });
     return error ? 'Пачкадағы сан сақталмады. Қайта көріңіз.' : null;
@@ -39,7 +51,7 @@ export class ProductService {
     const all: Product[] = [];
     for (let from = 0; ; from += pageSize) {
       const { data, error } = await supabase
-        .from('products').select('*').order('name').order('id').range(from, from + pageSize - 1);
+        .from('products').select('*').is('archived_at', null).order('name').order('id').range(from, from + pageSize - 1);
       if (error) return;
       all.push(...((data ?? []) as Product[]));
       if (!data || data.length < pageSize) break;
@@ -55,13 +67,8 @@ export class ProductService {
   }
 
   async remove(id: number): Promise<string | null> {
-    // The foreign key from order_items prevents deleting books used in orders.
-    const { data, error } = await supabase.from('products').delete()
-      .eq('id', id).neq('barcode', 'OPENING-BALANCE').select('id');
-    if (error) return error.code === '23503'
-      ? 'Бұл кітап тапсырыстарда қолданылған, сондықтан жоюға болмайды.'
-      : error.message;
-    if (!data?.length) return 'Кітап жойылмады: жоюға рұқсат жоқ немесе кітап табылмады.';
+    const { error } = await supabase.rpc('archive_product', { p_product_id: id });
+    if (error) return 'Кітап прайстан алынбады. Рұқсат пен SQL жаңартуын тексеріп, қайта көріңіз.';
     this.products.update(products => products.filter(product => product.id !== id));
     return null;
   }

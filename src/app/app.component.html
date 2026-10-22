@@ -923,7 +923,7 @@
           </table>
         </div>
 
-        <div class="order-detail-panel" *ngIf="selectedOrder()">
+        <div class="order-detail-panel" id="order-detail-panel" *ngIf="selectedOrder()">
           <div class="order-detail-head">
             <div>
               <span class="order-detail-num">{{ selectedOrder()!.id }}</span>
@@ -978,7 +978,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let item of sortedOrderItems(); let i = index">
+                  <tr *ngFor="let item of sortedOrderItems(); let i = index; trackBy: trackOrderItem">
                     <td>{{ i + 1 }}</td>
                     <td>
                       <strong>{{ item.name }}</strong>
@@ -1532,7 +1532,8 @@
         </label>
         <label class="modal-field-label">
           Жеңілдіксіз негізгі баға (₸)
-          <input type="number" min="0.01" step="0.01" class="modal-qty-input" [(ngModel)]="editProdBasePrice" [disabled]="productSaving() || (role() === 'manager' && !creatingProduct())">
+          <input type="number" min="0.01" step="0.01" class="modal-qty-input" [(ngModel)]="editProdBasePrice" [disabled]="productSaving()">
+          <small *ngIf="!creatingProduct()">Жаңа баға келесі тапсырыстарға қолданылады. Бұрынғы тапсырыстардың бағасы өзгермейді.</small>
         </label>
         <label class="modal-field-label">
           Кітаптың жеңілдігі (%)

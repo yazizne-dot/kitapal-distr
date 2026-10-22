@@ -11,7 +11,7 @@ const checks = [
   ['delete reloads before clearing selection', files.component, 'await this.reloadAll();\n    if (this.selectedOrderId() === orderId) {\n      this.selectedOrderId.set(\'\');'],
   ['delete closes add item modal', files.component, 'this.addItemModal.set(false);'],
   ['delete closes ship modal', files.component, 'this.shipModal.set(false);'],
-  ['detail panel stays guarded', files.template, '<div class="order-detail-panel" *ngIf="selectedOrder()">'],
+  ['detail panel stays guarded', files.template, '<div class="order-detail-panel" id="order-detail-panel" *ngIf="selectedOrder()">'],
 ];
 
 const forbidden = [
